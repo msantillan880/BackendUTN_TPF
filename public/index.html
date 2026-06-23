@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>BookmarksUtn</title>
+
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">BookmarksUtn</div>
+
+      <!-- Botón para expandir o comprimir el formulario -->
+      <button class="toggle-btn" onclick="toggleForm()">
+        Expandir/Comprimir Formulario
+      </button>
+
+      <div class="form-container">
+        <form id="myForm">
+          <div class="form-group">
+            <label class="required">Espacio:</label>
+            <input type="text" id="categoria" name="categoria" />
+          </div>
+          <div class="form-group">
+            <label class="required">Nombre:</label>
+            <input type="text" id="nombre" name="nombre" />
+          </div>
+          <div class="form-group">
+            <label>Comentario:</label>
+            <input type="text" id="comentario" name="comentario" />
+          </div>
+          <div class="form-group">
+            <label class="required">Direccion:</label>
+            <input type="text" id="direccion" name="direccion" />
+          </div>
+        </form>
+      </div>
+
+      <div class="button-container">
+        <button onclick="crear()">Agregar</button>
+        <button onclick="modificar()">Modificar</button>
+        <button onclick="borrar()">Borrar</button>
+        <button onclick="buscar()">Buscar</button>
+        <button onclick="limpiar()">Limpiar</button>
+        <button onclick="publicar()">Html</button>
+        <button onclick="info()">Manual</button>
+        <button onclick="docs()">Espacio</button>
+        <button onclick="log()">Log</button>
+        <button onclick="salir()">Salir</button>
+      </div>
+
+      <div class="table-container">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Id</th>
+                <th>Espacio</th>
+                <th>Nombre</th>
+                <th>Comentario</th>
+                <th>Dirección</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Los datos de los links se insertarán aquí -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Socket.IO debe cargarse antes del script principal -->
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script src="/index.js"></script>
+  </body>
+</html>

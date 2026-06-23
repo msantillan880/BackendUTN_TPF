@@ -1,0 +1,160 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+  background-image: url("/images/imagenX.jpg");
+  background-size: cover;
+  background-attachment: fixed;
+  background-position: center;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  background-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.header {
+  background-color: #d3d3d3;
+  padding: 10px;
+  text-align: center;
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+
+.form-container {
+  padding: 1px; /* modificado para que oculte el form */
+  background-color: #b0e0e6;
+  max-height: 800px; /* Altura inicial del formulario */
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.form-container.expanded {
+  max-height: 0px; /* Altura al expandir el formulario */
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group {
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+}
+
+.form-group label {
+  width: 100px;
+  text-align: right;
+  margin-right: 10px;
+}
+
+.form-group input {
+  flex: 1;
+  padding: 5px;
+  border: 1px solid #ccc;
+}
+
+.button-container {
+  display: flex;
+  justify-content: space-between;
+  background-color: #0000cd;
+  padding: 5px;
+  margin: 20px 0;
+}
+
+.button-container button {
+  flex: 1;
+  margin: 0 2px;
+  padding: 5px 10px;
+  background-color: #f0f0f0;
+  border: 1px solid #999;
+  cursor: pointer;
+}
+
+.button-container button:hover {
+  background-color: #e0e0e0;
+}
+
+.toggle-btn {
+  float: right;
+}
+
+.table-container {
+  padding: 20px;
+  position: relative;
+  height: 650px; /* Aumentada la altura para mostrar 10 filas */
+}
+
+.table-wrapper {
+  overflow: auto;
+  height: 100%;
+  position: relative;
+}
+
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background-color: white;
+}
+
+thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: #0000cd;
+}
+
+th {
+  background-color: #0000cd;
+  color: white;
+  font-weight: bold;
+  border: 1px solid #ddd;
+  border-bottom: 2px solid #ddd;
+  padding: 12px 8px; /* Aumentado el padding vertical */
+  text-align: center; /* Centrado el texto del encabezado */
+  min-width: 150px;
+  position: sticky;
+  top: 0;
+}
+
+/* Hacer la columna dirección más ancha */
+th:last-child,
+td:last-child {
+  min-width: 400px; /* Doble ancho para la columna dirección */
+}
+
+td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+  height: 20px; /* Altura fija para las filas */
+}
+
+tr:hover {
+  background-color: #f5f5f5;
+}
+
+.required:after {
+  content: "*";
+  color: red;
+}
+
+tr.selected {
+  background-color: #add8e6; /* Color celeste para la fila seleccionada */
+}
+
+/* Ajuste para mantener el header fijo en scroll horizontal */
+th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+}
+
+/* Ocultar visualmente la primera columna (Id) pero mantenerla en el DOM */
+th:first-child, td:first-child {
+  display: none;
+}

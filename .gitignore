@@ -1,0 +1,4 @@
+node_modules/
+.qodo
+*.db-shm
+*.db-wal

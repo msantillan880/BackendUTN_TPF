@@ -1,0 +1,98 @@
+{
+  "info": {
+    "name": "Bookmarks - API",
+    "_postman_id": "bookmarks-nodejs-collection",
+    "description": "Colección de ejemplo para importar en Postman: endpoints de la API de Bookmarks",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET /api/links",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "http://localhost:5000/api/links"
+      },
+      "response": []
+    },
+    {
+      "name": "GET /api/links/:id",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "http://localhost:5000/api/links/1"
+      },
+      "response": []
+    },
+    {
+      "name": "POST /api/crear",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"categoria\": \"ASTRONOMIA\",\n  \"nombre\": \"Nasa\",\n  \"comentario\": \"Sitio oficial en español\",\n  \"direccion\": \"https://ciencia.nasa.gov/\"\n}"
+        },
+        "url": "http://localhost:5000/api/crear"
+      },
+      "response": []
+    },
+    {
+      "name": "PUT /api/actualizar/:id",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"categoria\": \"ASTRONOMIA\",\n  \"nombre\": \"Nasa - Actualizado\",\n  \"comentario\": \"Actualizado\",\n  \"direccion\": \"https://ciencia.nasa.gov/\"\n}"
+        },
+        "url": "http://localhost:5000/api/actualizar/1"
+      },
+      "response": []
+    },
+    {
+      "name": "DELETE /api/eliminar/:id",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "http://localhost:5000/api/eliminar/1"
+      },
+      "response": []
+    },
+    {
+      "name": "POST /api/buscar",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"categoria\": \"ASTRONOMIA\",\n  \"nombre\": \"\",\n  \"comentario\": \"\",\n  \"direccion\": \"\"\n}"
+        },
+        "url": "http://localhost:5000/api/buscar"
+      },
+      "response": []
+    },
+    {
+      "name": "POST /api/generar-html (descarga)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "http://localhost:5000/api/generar-html"
+      },
+      "response": []
+    },
+    {
+      "name": "GET /api/log-view",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "http://localhost:5000/api/log-view"
+      },
+      "response": []
+    }
+  ]
+}
