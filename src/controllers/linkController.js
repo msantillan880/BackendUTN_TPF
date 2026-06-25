@@ -16,36 +16,15 @@ await initDatabase();
 ========================= */
 
 function queryAll(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    try {
-      const stmt = db.prepare(sql);
-      resolve(stmt.all(...params));
-    } catch (err) {
-      reject(err);
-    }
-  });
+  return db.execute(sql, params).then(([rows]) => rows);
 }
 
 function queryOne(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    try {
-      const stmt = db.prepare(sql);
-      resolve(stmt.get(...params) || null);
-    } catch (err) {
-      reject(err);
-    }
-  });
+  return db.execute(sql, params).then(([rows]) => (rows && rows[0]) || null);
 }
 
 function queryRun(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    try {
-      const stmt = db.prepare(sql);
-      resolve(stmt.run(...params));
-    } catch (err) {
-      reject(err);
-    }
-  });
+  return db.execute(sql, params).then(([result]) => result);
 }
 
 /* =========================
@@ -82,7 +61,7 @@ export class LinkController {
 
     return {
       success: true,
-      id: result.lastInsertRowid
+      id: result.insertId || null
     };
   }
 

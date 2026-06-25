@@ -7,7 +7,7 @@ Este proyecto es una aplicación de administración de marcadores (bookmarks) im
 - API REST para CRUD de links
 - Búsqueda con filtros por `categoria`, `nombre`, `comentario` y `direccion`
 - Comunicación en tiempo real con Socket.IO (observador para logs/notificaciones)
-- Persistencia en SQLite (`better-sqlite3`)
+- Persistencia en MySQL (`mysql2`) — migración en curso
 - Logger centralizado con `winston`
 
 Estructura principal
@@ -64,6 +64,35 @@ Consideraciones:
 
 - Separación en capas: la aplicación organiza rutas, controladores y consulta a la BD en archivos separados, lo cual sigue buenas prácticas básicas.
 - Recomendaciones de mejora: paginación, test unitarios.
+
+## Migración a MySQL
+
+Se migró la persistencia de `better-sqlite3` a `mysql2` usando un pool de conexiones.
+Variables de entorno (opcional, con valores por defecto):
+
+- `MYSQL_HOST` (por defecto `127.0.0.1`)
+- `MYSQL_PORT` (por defecto `3306`)
+- `MYSQL_USER` (por defecto `root`)
+- `MYSQL_PASSWORD` (por defecto ``)
+- `MYSQL_DATABASE` (por defecto `bookmarks`)
+
+Pasos para ejecutar con MySQL:
+
+1. Crear la base de datos (si no existe):
+
+```sql
+CREATE DATABASE IF NOT EXISTS bookmarks CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+```
+
+2. Exportar variables de entorno o crear `.env` con las mismas.
+3. Instalar dependencias y ejecutar:
+
+```bash
+npm install
+npm start
+```
+
+Si prefieres seguir usando SQLite temporalmente, restaura la dependencia o ejecuta la rama anterior.
 
 Resumen de próximos pasos sugeridos
 

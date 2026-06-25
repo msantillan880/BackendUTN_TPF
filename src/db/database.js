@@ -1,47 +1,57 @@
-import Database from 'better-sqlite3';
+import mysql from 'mysql2/promise';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, '../../data/bookmarks.db');
 const logsDir = path.join(__dirname, '../logs');
-
-console.log("DB PATH:", dbPath);
-console.log("__dirname:", __dirname);
 
 // Crear carpeta logs si no existe
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// Conectar a la base de datos
-const db = new Database(dbPath);
-db.pragma('journal_mode = WAL');
+// Configuración desde variables de entorno (usar .env si es necesario)
+const MYSQL_HOST = process.env.MYSQL_HOST || '127.0.0.1';
+const MYSQL_USER = process.env.MYSQL_USER || 'root';
+const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || '';
+const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'bookmarks';
+const MYSQL_PORT = process.env.MYSQL_PORT ? Number(process.env.MYSQL_PORT) : 3306;
 
-console.log('✅ Conectado a SQLite');
+// Crear pool de conexiones
+const pool = mysql.createPool({
+  host: MYSQL_HOST,
+  user: MYSQL_USER,
+  password: MYSQL_PASSWORD,
+  database: MYSQL_DATABASE,
+  port: MYSQL_PORT,
+  waitForConnections: true,
+  connectionLimit: 10,
+  namedPlaceholders: false
+});
+
+console.log(`✅ Conectando a MySQL ${MYSQL_USER}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE}`);
 
 // Inicializar tabla
 export async function initDatabase() {
   try {
     const CREATE_TABLE = `
       CREATE TABLE IF NOT EXISTS links (
-        link_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
-        categoria TEXT NOT NULL,
-        nombre TEXT NOT NULL,
+        link_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+        categoria VARCHAR(255) NOT NULL,
+        nombre VARCHAR(255) NOT NULL,
         comentario TEXT,
-        direccion TEXT NOT NULL,
+        direccion VARCHAR(2048) NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
+      ) ENGINE=InnoDB;
     `;
 
-    db.exec(CREATE_TABLE);
-    console.log('✅ Tabla links verificada/creada');
+    await pool.execute(CREATE_TABLE);
+    console.log('✅ Tabla links verificada/creada (MySQL)');
   } catch (err) {
-    console.error('❌ Error al inicializar BD:', err.message);
+    console.error('❌ Error al inicializar BD MySQL:', err && err.message);
     throw err;
   }
 }
 
-export default db;
+export default pool;

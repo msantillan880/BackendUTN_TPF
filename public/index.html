@@ -10,16 +10,73 @@
     <div class="container">
       <div class="header">BookmarksUtn</div>
 
-      <!-- Botón para expandir o comprimir el formulario -->
-      <button class="toggle-btn" onclick="toggleForm()">
-        Expandir/Comprimir Formulario
-      </button>
+      <div class="session-banner">
+        Usuario logueado:
+        <a href="#" id="loggedUserLink">usuario1</a>
+        <span class="session-sep">|</span>
+        Ver como:
+        <button type="button" class="mock-user-btn" id="btnUser1">
+          usuario1
+        </button>
+        <button type="button" class="mock-user-btn" id="btnUser2">
+          usuario2
+        </button>
+      </div>
+
+      <div class="mock-top-actions">
+        <button
+          class="add-space-btn add-space-btn-secondary"
+          type="button"
+          onclick="toggleForm()"
+        >
+          Expandir/Comprimir Formulario
+        </button>
+        <button class="add-space-btn" id="btnToggleSpaceForm" type="button">
+          <span class="plus">+</span>
+          <span>Agregar espacio</span>
+        </button>
+      </div>
+
+      <div class="space-form-container hidden" id="spaceFormContainer">
+        <h4>Gestion del Espacio (Nuevo)</h4>
+        <form id="spaceForm" class="owner-space-form">
+          <div class="owner-space-field">
+            <label>Email owner:<span class="required"> </span></label>
+            <input type="email" id="ownerEmail" name="ownerEmail" />
+          </div>
+          <div class="owner-space-field">
+            <label>Nombre espacio:<span class="required"> </span></label>
+            <input type="text" id="spaceName" name="spaceName" />
+          </div>
+          <div class="owner-space-field">
+            <label>Nombre owner:<span class="required"> </span></label>
+            <input type="text" id="ownerName" name="ownerName" />
+          </div>
+          <div class="owner-space-field">
+            <label>Tipo espacio:<span class="required"> </span></label>
+            <select id="spaceType" name="spaceType">
+              <option value="publico">Publico</option>
+              <option value="privado">Privado</option>
+            </select>
+          </div>
+          <div class="space-form-actions">
+            <button type="submit">Crear</button>
+            <button type="button" id="btnCancelSpaceForm">Cancelar</button>
+          </div>
+        </form>
+      </div>
 
       <div class="form-container">
         <form id="myForm">
-          <div class="form-group">
+          <div class="form-group space-action-row">
             <label class="required">Espacio:</label>
-            <input type="text" id="categoria" name="categoria" />
+            <div class="space-action-grid">
+              <select id="categoria" name="categoria"></select>
+              <div class="space-action-side">
+                <span class="space-action-label">Accion:</span>
+                <div class="status-inline" id="spaceSelectionAction">-</div>
+              </div>
+            </div>
           </div>
           <div class="form-group">
             <label class="required">Nombre:</label>
@@ -37,17 +94,61 @@
       </div>
 
       <div class="button-container">
-        <button onclick="crear()">Agregar</button>
-        <button onclick="modificar()">Modificar</button>
-        <button onclick="borrar()">Borrar</button>
-        <button onclick="buscar()">Buscar</button>
-        <button onclick="limpiar()">Limpiar</button>
-        <button onclick="publicar()">Html</button>
-        <button onclick="info()">Manual</button>
-        <button onclick="docs()">Espacio</button>
-        <button onclick="log()">Log</button>
-        <button onclick="salir()">Salir</button>
+        <button id="btnAgregar" onclick="crear()">Agregar</button>
+        <button id="btnModificar" onclick="modificar()">Modificar</button>
+        <button id="btnBorrar" onclick="borrar()">Borrar</button>
+        <button id="btnBuscar" onclick="buscar()">Buscar</button>
+        <button id="btnLimpiar" onclick="limpiar()">Limpiar</button>
+        <button id="btnHtml" onclick="publicar()">Html</button>
+        <button id="btnManual" onclick="info()">Manual</button>
+        <button id="btnEspacio" onclick="docs()">Edit Espacio</button>
+        <button id="btnLog" onclick="log()">Log</button>
+        <button id="btnSalir" onclick="salir()">Salir</button>
       </div>
+
+      <section class="owner-space-panel hidden" id="ownerSpacePanel">
+        <h4>Gestion del Espacio (Owner)</h4>
+        <div class="owner-space-form" id="ownerSpaceForm">
+          <div class="owner-space-field">
+            <label>Email owner:</label>
+            <input type="email" id="ownerPanelEmail" readonly />
+          </div>
+          <div class="owner-space-field">
+            <label>Nombre owner:</label>
+            <input type="text" id="ownerPanelName" readonly />
+          </div>
+          <div class="owner-space-field">
+            <label>Espacio:</label>
+            <input type="text" id="ownerPanelSpaceName" />
+          </div>
+          <div class="owner-space-field">
+            <label>Tipo:</label>
+            <select id="ownerPanelSpaceType">
+              <option value="publico">publico</option>
+              <option value="privado">privado</option>
+            </select>
+          </div>
+          <div class="owner-panel-actions">
+            <button type="button" id="ownerPanelSaveBtn">Modificar</button>
+            <button type="button" id="ownerPanelCancelBtn">Cancelar</button>
+          </div>
+        </div>
+        <div class="owner-users-table-wrap">
+          <table id="ownerUsersTable">
+            <thead>
+              <tr>
+                <th>Usuario autorizado</th>
+                <th>Estado</th>
+                <th>Accion</th>
+              </tr>
+            </thead>
+            <tbody id="ownerUsersTableBody"></tbody>
+          </table>
+        </div>
+        <div class="owner-private-message hidden" id="ownerPrivateMessage">
+          Espacio privado: sin gestion de autorizaciones visible.
+        </div>
+      </section>
 
       <div class="table-container">
         <div class="table-wrapper">

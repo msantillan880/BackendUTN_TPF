@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
@@ -8,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import linkRoutes from './routes/linkRoutes.js';
+import espacioRoutes from './routes/espacioRoutes.js';
 import { configurarSockets } from './routes/socketRoutes.js';
 import observer from './utils/observer.js';
 import { argentinaTimestamp } from './utils/time.js';
@@ -26,6 +28,7 @@ app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.use('/api', linkRoutes);
+app.use('/api', espacioRoutes);
 
 configurarSockets(io);
 
