@@ -9,7 +9,55 @@ import { validarXSS } from '../middleware/xssValidation.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-await initDatabase();
+const DEMO_MODE = ['1', 'true', 'yes'].includes(String(process.env.DEMO_MODE || '').toLowerCase());
+
+const mockLinks = [
+  {
+    link_id: 1,
+    categoria: 'ASTRONOMIA',
+    nombre: 'NASA',
+    comentario: 'Novedades del espacio',
+    direccion: 'https://www.nasa.gov',
+    created_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
+  },
+  {
+    link_id: 2,
+    categoria: 'CIBERSEGURIDAD',
+    nombre: 'OWASP',
+    comentario: 'Buenas practicas de seguridad',
+    direccion: 'https://owasp.org',
+    created_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
+  },
+  {
+    link_id: 3,
+    categoria: 'NODE.JS',
+    nombre: 'Node.js Docs',
+    comentario: 'Documentacion oficial',
+    direccion: 'https://nodejs.org/en/docs',
+    created_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
+  }
+];
+
+let nextMockId = mockLinks.length + 1;
+let dbAvailable = false;
+
+if (!DEMO_MODE) {
+  try {
+    await initDatabase();
+    dbAvailable = true;
+  } catch (err) {
+    console.warn('⚠️ MySQL no disponible, se usara almacenamiento en memoria para demo:', err && err.message);
+  }
+} else {
+  console.log('ℹ️ DEMO_MODE activo: usando almacenamiento en memoria (sin MySQL).');
+}
+
+const useMockStore = () => DEMO_MODE || !dbAvailable;
+
+function getMockById(id) {
+  const parsed = Number(id);
+  return mockLinks.find((item) => Number(item.link_id) === parsed) || null;
+}
 
 /* =========================
    QUERIES HELPERS
@@ -34,11 +82,19 @@ function queryRun(sql, params = []) {
 export class LinkController {
 
   static async obtenerTodos() {
+    if (useMockStore()) {
+      return [...mockLinks].sort((a, b) => String(b.categoria).localeCompare(String(a.categoria)));
+    }
+
     const rows = await queryAll(Consulta.REFRESH);
     return rows || [];
   }
 
   static async obtenerPorId(id) {
+    if (useMockStore()) {
+      return getMockById(id);
+    }
+
     return await queryOne(Consulta.FIND_BY_ID, [id]);
   }
 
@@ -53,6 +109,25 @@ export class LinkController {
     const { texto: dirLimpia } = validarXSS(direccion);
 
     const newLink = new Link(catLimpia, nomLimpia, comLimpia, dirLimpia);
+
+    if (useMockStore()) {
+      const item = {
+        link_id: nextMockId++,
+        categoria: newLink.categoria,
+        nombre: newLink.nombre,
+        comentario: newLink.comentario,
+        direccion: newLink.direccion,
+        created_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
+      };
+      mockLinks.push(item);
+
+      observer.notificar(`[CREAR] Nombre: ${nomLimpia}, Comentario: ${comLimpia}, Direccion: ${dirLimpia}`);
+
+      return {
+        success: true,
+        id: item.link_id
+      };
+    }
 
     const result = await queryRun(Consulta.INSERT_LINK, newLink.toArray());
 
@@ -74,13 +149,23 @@ export class LinkController {
     const { texto: comLimpia } = validarXSS(comentario || '');
     const { texto: dirLimpia } = validarXSS(direccion);
 
-    await queryRun(Consulta.UPDATE, [
-      catLimpia,
-      nomLimpia,
-      comLimpia,
-      dirLimpia,
-      id
-    ]);
+    if (useMockStore()) {
+      const item = getMockById(id);
+      if (!item) throw new Error('Link no encontrado');
+
+      item.categoria = catLimpia;
+      item.nombre = nomLimpia;
+      item.comentario = comLimpia;
+      item.direccion = dirLimpia;
+    } else {
+      await queryRun(Consulta.UPDATE, [
+        catLimpia,
+        nomLimpia,
+        comLimpia,
+        dirLimpia,
+        id
+      ]);
+    }
 
     // Incluir valores antes y despues de la modificación
     try {
@@ -100,8 +185,15 @@ export class LinkController {
     const existe = await this.obtenerPorId(id);
     if (!existe) throw new Error('Link no encontrado');
 
-
-    await queryRun(Consulta.DELETE, [id]);
+    if (useMockStore()) {
+      const parsed = Number(id);
+      const index = mockLinks.findIndex((item) => Number(item.link_id) === parsed);
+      if (index >= 0) {
+        mockLinks.splice(index, 1);
+      }
+    } else {
+      await queryRun(Consulta.DELETE, [id]);
+    }
 
     // Incluir datos del registro borrado
     try {
@@ -150,8 +242,19 @@ export class LinkController {
       params.push(like(direccion));
     }
 
-    const sql = `SELECT * FROM links WHERE ${condiciones.join(' AND ')} ORDER BY categoria ASC`;
-    const rows = await queryAll(sql, params);
+    let rows = [];
+    if (useMockStore()) {
+      rows = mockLinks.filter((item) => {
+        const byCategoria = !categoria || String(item.categoria || '').toLowerCase().includes(categoria.toLowerCase());
+        const byNombre = !nombre || String(item.nombre || '').toLowerCase().includes(nombre.toLowerCase());
+        const byComentario = !comentario || String(item.comentario || '').toLowerCase().includes(comentario.toLowerCase());
+        const byDireccion = !direccion || String(item.direccion || '').toLowerCase().includes(direccion.toLowerCase());
+        return byCategoria && byNombre && byComentario && byDireccion;
+      }).sort((a, b) => String(a.categoria).localeCompare(String(b.categoria)));
+    } else {
+      const sql = `SELECT * FROM links WHERE ${condiciones.join(' AND ')} ORDER BY categoria ASC`;
+      rows = await queryAll(sql, params);
+    }
 
     // Registrar en observer el criterio de búsqueda (sin exponer datos sensibles)
     try {
@@ -173,7 +276,9 @@ export class LinkController {
   ========================= */
 
   static async generarHTML() {
-    const rows = await queryAll(Consulta.ORDER_HTML);
+    const rows = useMockStore()
+      ? [...mockLinks].sort((a, b) => String(a.categoria).localeCompare(String(b.categoria)))
+      : await queryAll(Consulta.ORDER_HTML);
     // Intentar incrustar la imagen de fondo como data URI desde public/images/imagenX.jpg
     let bgImage = "imagenX.jpg"; // fallback (relative)
     try {

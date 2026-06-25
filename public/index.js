@@ -18,7 +18,7 @@ const mockState = {
     ],
     spaces: [
         { id: 1, nombre: 'Astronomia', ownerId: 2, tipo: 'publico' },
-        { id: 2, nombre: 'Ciberseguridad', ownerId: 2, tipo: 'privado' },
+        { id: 2, nombre: 'Ciberseguridad', ownerId: 2, tipo: 'publico' },
         { id: 3, nombre: 'Node.js', ownerId: 2, tipo: 'publico' }
     ],
     memberships: DEFAULT_MOCK_MEMBERSHIPS.map(m => ({ ...m })),
@@ -494,6 +494,30 @@ async function requestJson(url, options = {}) {
 }
 
 async function ensureOwnerInDatabase(nombre, email) {
+    if (USE_MULTIUSER_MOCK) {
+        const existingMock = (mockState.users || []).find(u =>
+            String(u.email || '').toLowerCase() === String(email || '').toLowerCase()
+        );
+
+        if (existingMock) {
+            return {
+                idUsuario: existingMock.id,
+                nombre: existingMock.nombre,
+                email: existingMock.email
+            };
+        }
+
+        const nextUserId = (Math.max(...mockState.users.map(u => Number(u.id) || 0), 0) + 1);
+        const createdMock = { id: nextUserId, nombre, email };
+        mockState.users.push(createdMock);
+
+        return {
+            idUsuario: createdMock.id,
+            nombre: createdMock.nombre,
+            email: createdMock.email
+        };
+    }
+
     const users = await requestJson('/api/usuarios');
     const existing = (users || []).find(u =>
         String(u.email || '').toLowerCase() === String(email || '').toLowerCase()
@@ -515,6 +539,11 @@ async function ensureOwnerInDatabase(nombre, email) {
 }
 
 async function createSpaceInDatabase(denominacion, idOwner, tipoEspacio) {
+    if (USE_MULTIUSER_MOCK) {
+        const nextSpaceId = (Math.max(...mockState.spaces.map(s => Number(s.id) || 0), 0) + 1);
+        return nextSpaceId;
+    }
+
     const created = await requestJson('/api/espacios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -687,6 +716,31 @@ socket.on('respuesta_registro', function (data) {
 var selectedId = null;
 
 function crear() {
+    if (USE_MULTIUSER_MOCK) {
+        const space = getSelectedSpace();
+        if (!space || !canViewSpaceInfo(space)) {
+            alert('Sin autorizacion para agregar links en este espacio.');
+            return;
+        }
+
+        const nombre = document.getElementById("nombre").value;
+        const comentario = document.getElementById("comentario").value;
+        const direccion = document.getElementById("direccion").value;
+
+        if (!nombre || !direccion) {
+            alert('Complete al menos nombre y direccion.');
+            return;
+        }
+
+        if (!mockState.linksBySpace[space.id]) {
+            mockState.linksBySpace[space.id] = [];
+        }
+
+        mockState.linksBySpace[space.id].push({ nombre, comentario, direccion });
+        renderSelectedSpaceLinksInMainTable();
+        return;
+    }
+
     // Función para crear nuevo registro
     // Obtener los valores de los campos
     var categoria = document.getElementById("categoria").value;
@@ -724,6 +778,35 @@ function crear() {
 }
 
 function modificar() {
+    if (USE_MULTIUSER_MOCK) {
+        const space = getSelectedSpace();
+        if (!space || !canViewSpaceInfo(space)) {
+            alert('Sin autorizacion para modificar links en este espacio.');
+            return;
+        }
+
+        if (!selectedId) {
+            alert("Seleccione primero una fila de la tabla para modificar");
+            return;
+        }
+
+        const idx = Number(selectedId) - 1;
+        const list = mockState.linksBySpace[space.id] || [];
+        if (!list[idx]) {
+            alert('Link no encontrado.');
+            return;
+        }
+
+        list[idx] = {
+            nombre: document.getElementById("nombre").value,
+            comentario: document.getElementById("comentario").value,
+            direccion: document.getElementById("direccion").value
+        };
+
+        renderSelectedSpaceLinksInMainTable();
+        return;
+    }
+
     // Modificar registro seleccionado
     if (!selectedId) {
         alert("Seleccione primero una fila de la tabla para modificar");
@@ -760,6 +843,32 @@ function modificar() {
 }
 
 function borrar() {
+    if (USE_MULTIUSER_MOCK) {
+        const space = getSelectedSpace();
+        if (!space || !canViewSpaceInfo(space)) {
+            alert('Sin autorizacion para eliminar links en este espacio.');
+            return;
+        }
+
+        if (!selectedId) {
+            alert("Seleccione primero una fila de la tabla para borrar");
+            return;
+        }
+
+        if (!confirm("¿Confirma que desea eliminar el registro seleccionado?")) {
+            return;
+        }
+
+        const idx = Number(selectedId) - 1;
+        const list = mockState.linksBySpace[space.id] || [];
+        if (idx >= 0 && idx < list.length) {
+            list.splice(idx, 1);
+        }
+
+        renderSelectedSpaceLinksInMainTable();
+        return;
+    }
+
     // Borrar registro seleccionado
     if (!selectedId) {
         alert("Seleccione primero una fila de la tabla para borrar");
@@ -786,6 +895,51 @@ function borrar() {
 }
 
 function buscar() {
+    if (USE_MULTIUSER_MOCK) {
+        const space = getSelectedSpace();
+        if (!space || !canViewSpaceInfo(space)) {
+            alert('Sin autorizacion para buscar en este espacio.');
+            return;
+        }
+
+        const nombre = String(document.getElementById("nombre").value || '').toLowerCase();
+        const comentario = String(document.getElementById("comentario").value || '').toLowerCase();
+        const direccion = String(document.getElementById("direccion").value || '').toLowerCase();
+        const categoria = String(document.getElementById("categoria").value || '').toLowerCase();
+
+        const list = (mockState.linksBySpace[space.id] || []).filter((item) => {
+            const byNombre = !nombre || String(item.nombre || '').toLowerCase().includes(nombre);
+            const byComentario = !comentario || String(item.comentario || '').toLowerCase().includes(comentario);
+            const byDireccion = !direccion || String(item.direccion || '').toLowerCase().includes(direccion);
+            const byCategoria = !categoria || String(space.nombre || '').toLowerCase().includes(categoria);
+            return byNombre && byComentario && byDireccion && byCategoria;
+        });
+
+        const tableBody = document.querySelector(".table-container tbody");
+        if (!tableBody) return;
+        tableBody.innerHTML = '';
+
+        list.forEach((item, idx) => {
+            const row = tableBody.insertRow();
+            row.insertCell(0).textContent = idx + 1;
+            row.insertCell(1).textContent = space.nombre.toUpperCase();
+            row.insertCell(2).textContent = item.nombre;
+            row.insertCell(3).textContent = item.comentario;
+            const linkCell = row.insertCell(4);
+            const a = document.createElement('a');
+            a.href = item.direccion;
+            a.textContent = item.direccion;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.addEventListener('click', function (e) { e.stopPropagation(); });
+            linkCell.appendChild(a);
+        });
+
+        selectedId = null;
+        agregarEventosTabla();
+        return;
+    }
+
     // Buscar registros por los campos del formulario
     var categoria = document.getElementById("categoria").value;
     var nombre = document.getElementById("nombre").value;

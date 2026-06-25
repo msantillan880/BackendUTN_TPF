@@ -17,6 +17,7 @@ const MYSQL_USER = process.env.MYSQL_USER || 'root';
 const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || '';
 const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'bookmarks';
 const MYSQL_PORT = process.env.MYSQL_PORT ? Number(process.env.MYSQL_PORT) : 3306;
+const DEMO_MODE = ['1', 'true', 'yes'].includes(String(process.env.DEMO_MODE || '').toLowerCase());
 
 // Crear pool de conexiones
 const pool = mysql.createPool({
@@ -30,7 +31,11 @@ const pool = mysql.createPool({
   namedPlaceholders: false
 });
 
-console.log(`✅ Conectando a MySQL ${MYSQL_USER}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE}`);
+if (!DEMO_MODE) {
+  console.log(`✅ Conectando a MySQL ${MYSQL_USER}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE}`);
+} else {
+  console.log('ℹ️ DEMO_MODE activo: se omite conexion efectiva a MySQL.');
+}
 
 // Inicializar tabla
 export async function initDatabase() {

@@ -142,6 +142,39 @@ router.get('/log-view', async (req, res, next) => {
   try {
     const filePath = path.join(__dirname, '../logs/registro_logs.log');
 
+    if (!fs.existsSync(filePath)) {
+      return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Registro de Logs</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f4f4f4;
+          }
+
+          h1 {
+            color: #333;
+          }
+
+          .box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Registro de Logs</h1>
+        <div class="box">No hay archivo de logs disponible en este entorno de ejecucion.</div>
+      </body>
+      </html>
+    `);
+    }
+
     // Leer y ordenar las líneas del log por timestamp (ISO) descendente
     const contenido = fs.readFileSync(filePath, 'utf8');
     const lineas = contenido.split('\n').filter(l => l.trim() !== '');

@@ -1,0 +1,55 @@
+GUIÓN ORAL - PRESENTACIÓN TPF (VERSIÓN NATURAL)
+
+Introducción
+Buenas, nuestro trabajo es una aplicación para gestionar bookmarks de forma colaborativa.
+La idea principal es poder organizar links por espacios temáticos y controlar quién puede ver o administrar cada espacio.
+
+Qué problema resuelve
+En lugar de tener favoritos sueltos o desordenados, la app centraliza todo por categorías de trabajo.
+Además, agrega permisos por usuario, para que cada espacio tenga lógica de acceso y ownership.
+
+Arquitectura general
+La aplicación está hecha con Node.js y Express en backend, frontend web con HTML, CSS y JavaScript, y base de datos MySQL.
+Se trabajó con una estructura por capas: rutas, controladores, modelos y queries SQL.
+También se incluyeron validaciones y sanitización de entradas.
+
+Migración principal
+Uno de los avances más importantes fue migrar la persistencia a MySQL.
+Se validó que el CRUD de links funcione correctamente con ese esquema nuevo.
+A partir de ahí se incorporaron tablas para la parte colaborativa: Usuarios, Espacios, Estados de Solicitudes y la relación Espacio_Usuarios.
+
+Funcionalidades de la app
+La app mantiene las operaciones base sobre links: alta, modificación, baja, búsqueda y exportación HTML.
+Sobre eso se sumó la gestión de espacios:
+- creación de espacios,
+- listado de miembros,
+- solicitud de ingreso,
+- aprobación, rechazo y expulsión.
+
+Flujo de demo recomendado
+Primero muestro el usuario 1 y selecciono un espacio autorizado para ver sus links.
+Después cambio a un espacio donde no está autorizado o está pendiente, para mostrar restricción de acceso.
+Luego cambio al usuario owner para mostrar opciones de administración del espacio.
+Entro al panel de edición de espacio, y muestro cómo cambia el comportamiento entre espacio público y privado.
+Por último uso la exportación HTML, que ahora respeta espacio seleccionado y permisos.
+
+Aclaración importante del mock
+Para la exposición, la parte multiusuario está en modo demo controlado.
+Esto se hizo para mostrar escenarios completos de permisos de forma estable durante la presentación.
+La base de datos y rutas están preparadas, y varias operaciones ya persisten en MySQL, pero ciertas interacciones de gestión están mockeadas intencionalmente para la demo.
+
+Seguridad y trazabilidad
+Se aplican validaciones de entrada y sanitización.
+Además, se registran eventos en logs para trazabilidad de acciones.
+
+Cierre
+En resumen, el sistema pasó de un CRUD básico de links a una app colaborativa por espacios, con migración a MySQL, nuevas tablas, control de permisos y una demo funcional de punta a punta.
+
+---
+
+VERSIÓN CORTA (1-2 MINUTOS)
+
+Hola, este TP es una app para gestionar bookmarks colaborativos por espacios.
+Migramos la persistencia a MySQL y agregamos tablas para usuarios, espacios y solicitudes de acceso.
+La demo muestra cambio de usuario, permisos por espacio, acciones de owner y exportación HTML filtrada por espacio autorizado.
+La parte multiusuario está en modo mock controlado para asegurar una presentación estable, pero la arquitectura backend y la base ya quedaron preparadas para continuar con persistencia completa.
