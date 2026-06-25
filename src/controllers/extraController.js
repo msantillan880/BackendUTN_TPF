@@ -1,7 +1,6 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import open from "open";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
