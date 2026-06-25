@@ -2,3 +2,5 @@ node_modules/
 .qodo
 *.db-shm
 *.db-wal
+# Local presentation notes
+public/guion_presentacion_tpf.txt
