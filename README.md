@@ -99,6 +99,37 @@ Resumen de próximos pasos sugeridos
 - Añadir validación de esquemas y middleware de errores uniforme.
 - Implementar tests unitarios e integración para endpoints y controllers.
 
+## Estado actual (post-demo)
+
+- El frontend multiusuario usa datos persistidos en MySQL para usuarios, espacios, membresias y links.
+- Se mantienen `usuario1` y `usuario2` como usuarios base para pruebas diarias.
+- Los links se asocian al espacio por `categoria = nombreDelEspacioEnMayusculas` (puente temporal hasta agregar `idEspacio` en `links`).
+
+## Re-seed para pruebas diarias
+
+Para recuperar el estado base de demo persistido:
+
+1. Ejecutar el script [src/db/003_seed_mock_multiusuario.sql](src/db/003_seed_mock_multiusuario.sql) sobre la base configurada (`bookmarks` por defecto).
+2. Reiniciar la app.
+
+Ejemplo:
+
+```bash
+mysql -h 127.0.0.1 -P 3306 -u root -p bookmarks < src/db/003_seed_mock_multiusuario.sql
+npm start
+```
+
+## Estructura mínima sugerida (avance inicial)
+
+Se agregó `src/config/db.js` para centralizar la configuración de base de datos.
+`src/db/database.js` se mantiene como compatibilidad y reexporta desde `src/config/db.js`.
+
+Siguientes pasos (en próximos commits):
+
+- `src/repositories/`: mover acceso SQL desde controllers.
+- `src/services/`: mover lógica de negocio.
+- Mantener `src/controllers/` solo para `req/res`.
+
 ---
 
 Fecha: 2026-06-22

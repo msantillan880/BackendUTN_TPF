@@ -1,4 +1,4 @@
-const USE_MULTIUSER_MOCK = true;
+const USE_MULTIUSER_MOCK = false;
 
 const DEFAULT_MOCK_MEMBERSHIPS = [
     { userId: 1, spaceId: 1, estado: 'aprobado' },
@@ -152,15 +152,16 @@ function renderLoggedUser() {
 
     const btnUser1 = document.getElementById('btnUser1');
     const btnUser2 = document.getElementById('btnUser2');
-    if (btnUser1) btnUser1.classList.toggle('active', mockState.currentUserId === 1);
-    if (btnUser2) btnUser2.classList.toggle('active', mockState.currentUserId === 2);
+    const user1 = mockState.users.find((u) => String(u.nombre || '').toLowerCase() === 'usuario1');
+    const user2 = mockState.users.find((u) => String(u.nombre || '').toLowerCase() === 'usuario2');
+    if (btnUser1) btnUser1.classList.toggle('active', !!user1 && mockState.currentUserId === user1.id);
+    if (btnUser2) btnUser2.classList.toggle('active', !!user2 && mockState.currentUserId === user2.id);
 }
 
 function switchMockUser(userId) {
     mockState.currentUserId = userId;
     mockState.selectedSpaceId = null;
-    // Escenario base fijo para demo.
-    mockState.memberships = DEFAULT_MOCK_MEMBERSHIPS.map(m => ({ ...m }));
+
     renderLoggedUser();
     renderSpaceOptions();
     renderSelectedSpaceStatus();
@@ -195,6 +196,99 @@ function toggleUserAuthorization(userId, spaceId) {
     mockState.memberships.push({ userId, spaceId, estado: 'aprobado' });
 }
 
+async function ensureBaseTestUsers() {
+    const requiredUsers = [
+        { nombre: 'usuario1', email: 'usuario1@mail.com' },
+        { nombre: 'usuario2', email: 'usuario2@mail.com' }
+    ];
+
+    for (const item of requiredUsers) {
+        await ensureOwnerInDatabase(item.nombre, item.email);
+    }
+}
+
+async function refreshUsersFromApi() {
+    const users = await requestJson('/api/usuarios');
+    mockState.users = (users || []).map((u) => ({
+        id: Number(u.idUsuario),
+        nombre: u.nombre,
+        email: u.email
+    }));
+
+    const user1 = mockState.users.find((u) => String(u.nombre || '').toLowerCase() === 'usuario1');
+    const user2 = mockState.users.find((u) => String(u.nombre || '').toLowerCase() === 'usuario2');
+
+    if (user1) {
+        mockState.currentUserId = user1.id;
+    } else if (user2) {
+        mockState.currentUserId = user2.id;
+    } else if (mockState.users.length > 0) {
+        mockState.currentUserId = mockState.users[0].id;
+    }
+}
+
+async function refreshSpacesAndMembershipsFromApi() {
+    const spaces = await requestJson('/api/espacios');
+    mockState.spaces = (spaces || []).map((space) => ({
+        id: Number(space.idEspacio),
+        nombre: space.denominacion,
+        ownerId: space.idOwner === null ? null : Number(space.idOwner),
+        tipo: space.tipoEspacio || 'publico'
+    }));
+
+    const allMemberships = [];
+    for (const space of mockState.spaces) {
+        const members = await requestJson(`/api/espacios/${space.id}/miembros`);
+        (members || []).forEach((m) => {
+            const estado = String(m.estadoDescripcion || '').trim().toLowerCase();
+            allMemberships.push({
+                userId: Number(m.idUsuario),
+                spaceId: space.id,
+                estado: estado || 'pendiente'
+            });
+        });
+    }
+
+    mockState.memberships = allMemberships;
+}
+
+async function refreshLinksFromApi() {
+    const links = await requestJson('/api/links');
+    const grouped = {};
+
+    mockState.spaces.forEach((space) => {
+        grouped[space.id] = [];
+    });
+
+    (links || []).forEach((link) => {
+        const space = mockState.spaces.find(
+            (s) => String(s.nombre || '').toUpperCase() === String(link.categoria || '').toUpperCase()
+        );
+
+        if (!space) return;
+
+        if (!grouped[space.id]) grouped[space.id] = [];
+        grouped[space.id].push({
+            link_id: Number(link.link_id),
+            nombre: link.nombre,
+            comentario: link.comentario,
+            direccion: link.direccion
+        });
+    });
+
+    mockState.linksBySpace = grouped;
+}
+
+async function hydrateStateFromApi() {
+    await ensureBaseTestUsers();
+    await refreshUsersFromApi();
+    await refreshSpacesAndMembershipsFromApi();
+    await refreshLinksFromApi();
+
+    const currentUserMembership = mockState.memberships.find((m) => m.userId === mockState.currentUserId);
+    mockState.selectedSpaceId = currentUserMembership ? currentUserMembership.spaceId : (mockState.spaces[0] ? mockState.spaces[0].id : null);
+}
+
 function setupOwnerPanelActions() {
     const btnSave = document.getElementById('ownerPanelSaveBtn');
     const btnCancel = document.getElementById('ownerPanelCancelBtn');
@@ -212,14 +306,7 @@ function setupOwnerPanelActions() {
                 return;
             }
 
-            space.nombre = newName;
-            space.tipo = newType;
-
-            hideOwnerSpacePanel();
-            renderSpaceOptions();
-            renderSelectedSpaceStatus();
-            renderSelectedSpaceLinksInMainTable();
-            updateActionButtonsVisibility();
+            alert('La edicion de datos del espacio se implementara en el siguiente paso.\nPor ahora se mantienen persistentes altas/bajas de links y solicitudes.');
         });
     }
 
@@ -297,13 +384,31 @@ function renderOwnerSpacePanel() {
         const isApproved = status === 'aprobado';
         btn.className = `owner-action-btn${isApproved ? ' desauth' : ''}`;
         btn.textContent = isApproved ? 'Expulsar' : 'Aprobar';
-        btn.addEventListener('click', () => {
-            toggleUserAuthorization(u.id, space.id);
-            renderOwnerSpacePanel();
-            renderSpaceOptions();
-            renderSelectedSpaceStatus();
-            renderSelectedSpaceLinksInMainTable();
-            updateActionButtonsVisibility();
+        btn.addEventListener('click', async () => {
+            try {
+                if (isApproved) {
+                    await requestJson(`/api/espacios/${space.id}/usuarios/${u.id}/expulsar`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ aprobadoPor: mockState.currentUserId })
+                    });
+                } else {
+                    await requestJson(`/api/espacios/${space.id}/solicitudes/${u.id}/aprobar`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ aprobadoPor: mockState.currentUserId })
+                    });
+                }
+
+                await refreshSpacesAndMembershipsFromApi();
+                renderOwnerSpacePanel();
+                renderSpaceOptions();
+                renderSelectedSpaceStatus();
+                renderSelectedSpaceLinksInMainTable();
+                updateActionButtonsVisibility();
+            } catch (err) {
+                alert(`No se pudo actualizar autorizacion: ${err.message}`);
+            }
         });
         actionCell.appendChild(btn);
 
@@ -320,11 +425,18 @@ function setupMockUserSwitcher() {
     const btnUser1 = document.getElementById('btnUser1');
     const btnUser2 = document.getElementById('btnUser2');
 
+    const user1 = mockState.users.find((u) => String(u.nombre || '').toLowerCase() === 'usuario1');
+    const user2 = mockState.users.find((u) => String(u.nombre || '').toLowerCase() === 'usuario2');
+
     if (btnUser1) {
-        btnUser1.addEventListener('click', () => switchMockUser(1));
+        btnUser1.addEventListener('click', () => {
+            if (user1) switchMockUser(user1.id);
+        });
     }
     if (btnUser2) {
-        btnUser2.addEventListener('click', () => switchMockUser(2));
+        btnUser2.addEventListener('click', () => {
+            if (user2) switchMockUser(user2.id);
+        });
     }
 }
 
@@ -418,7 +530,26 @@ function renderSelectedSpaceStatus() {
 
 function solicitarAutorizacion(spaceId) {
     const space = mockState.spaces.find(s => s.id === spaceId);
-    alert(`Solicitud simulada para ${space ? space.nombre : 'el espacio seleccionado'}.\nEn este mock no se cambia estado.`);
+    if (!space) {
+        alert('Espacio no encontrado.');
+        return;
+    }
+
+    requestJson(`/api/espacios/${spaceId}/solicitudes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idUsuario: mockState.currentUserId })
+    })
+        .then(async () => {
+            await refreshSpacesAndMembershipsFromApi();
+            renderSpaceOptions();
+            renderSelectedSpaceStatus();
+            renderSelectedSpaceLinksInMainTable();
+            updateActionButtonsVisibility();
+        })
+        .catch((err) => {
+            alert(`No se pudo registrar la solicitud: ${err.message}`);
+        });
 }
 
 function renderSelectedSpaceLinksInMainTable() {
@@ -441,7 +572,7 @@ function renderSelectedSpaceLinksInMainTable() {
 
     links.forEach((item, idx) => {
         const row = document.createElement('tr');
-        row.insertCell(0).textContent = idx + 1;
+        row.insertCell(0).textContent = item.link_id || (idx + 1);
         row.insertCell(1).textContent = space.nombre.toUpperCase();
         row.insertCell(2).textContent = item.nombre;
         row.insertCell(3).textContent = item.comentario;
@@ -601,31 +732,12 @@ function setupSpaceForm() {
             return;
         }
 
-        let owner = mockState.users.find(u => u.email.toLowerCase() === ownerEmail.toLowerCase());
-        if (!owner) {
-            const nextUserId = Number(ownerDb && ownerDb.idUsuario) || (Math.max(...mockState.users.map(u => u.id)) + 1);
-            owner = { id: nextUserId, nombre: ownerName, email: ownerEmail };
-            mockState.users.push(owner);
-        }
+        await refreshUsersFromApi();
+        await refreshSpacesAndMembershipsFromApi();
+        await refreshLinksFromApi();
 
-        const nextSpaceId = persistedSpaceId || (Math.max(...mockState.spaces.map(s => s.id)) + 1);
-        const newSpace = {
-            id: nextSpaceId,
-            nombre: spaceName,
-            ownerId: owner.id,
-            tipo: spaceType
-        };
-
-        mockState.spaces.push(newSpace);
-        mockState.linksBySpace[nextSpaceId] = [
-            { nombre: `${spaceName} - Link 1`, comentario: 'Demo', direccion: 'https://example.com/1' },
-            { nombre: `${spaceName} - Link 2`, comentario: 'Demo', direccion: 'https://example.com/2' },
-            { nombre: `${spaceName} - Link 3`, comentario: 'Demo', direccion: 'https://example.com/3' }
-        ];
-
-        // Si el espacio lo crea el usuario actual, se considera acceso owner inmediato.
-        if (owner.id === mockState.currentUserId) {
-            mockState.selectedSpaceId = nextSpaceId;
+        if (persistedSpaceId) {
+            mockState.selectedSpaceId = Number(persistedSpaceId);
         }
 
         form.reset();
@@ -639,7 +751,13 @@ function setupSpaceForm() {
     });
 }
 
-function initMultiuserMock() {
+async function initMultiuserMock() {
+    try {
+        await hydrateStateFromApi();
+    } catch (err) {
+        alert(`No se pudieron cargar datos iniciales desde MySQL: ${err.message}`);
+    }
+
     setupMockUserSwitcher();
     setupOwnerPanelActions();
     renderLoggedUser();
@@ -693,7 +811,7 @@ function inicializarEventos() {
         return;
     }
 
-    updateTable();
+    initMultiuserMock();
 }
 
 window.onload = inicializarEventos;
@@ -741,9 +859,15 @@ function crear() {
         return;
     }
 
+    const selectedSpace = getSelectedSpace();
+    if (!selectedSpace || !canViewSpaceInfo(selectedSpace)) {
+        alert('Sin autorizacion para agregar links en este espacio.');
+        return;
+    }
+
     // Función para crear nuevo registro
     // Obtener los valores de los campos
-    var categoria = document.getElementById("categoria").value;
+    var categoria = String(selectedSpace.nombre || '').toUpperCase();
     var nombre = document.getElementById("nombre").value;
     var comentario = document.getElementById("comentario").value;
     var direccion = document.getElementById("direccion").value;
@@ -767,7 +891,7 @@ function crear() {
             if (data.success) {
                 console.log("Registro exitoso creado");
                 limpiar();
-                updateTable();
+                refreshLinksFromApi().then(() => renderSelectedSpaceLinksInMainTable());
             } else {
                 alert("Error al registrar");
             }
@@ -813,7 +937,13 @@ function modificar() {
         return;
     }
 
-    var categoria = document.getElementById("categoria").value;
+    const selectedSpace = getSelectedSpace();
+    if (!selectedSpace || !canViewSpaceInfo(selectedSpace)) {
+        alert('Sin autorizacion para modificar links en este espacio.');
+        return;
+    }
+
+    var categoria = String(selectedSpace.nombre || '').toUpperCase();
     var nombre = document.getElementById("nombre").value;
     var comentario = document.getElementById("comentario").value;
     var direccion = document.getElementById("direccion").value;
@@ -834,7 +964,7 @@ function modificar() {
             if (data.success) {
                 console.log("Registro actualizado");
                 limpiar();
-                updateTable();
+                refreshLinksFromApi().then(() => renderSelectedSpaceLinksInMainTable());
             } else {
                 alert("Error al actualizar");
             }
@@ -875,6 +1005,12 @@ function borrar() {
         return;
     }
 
+    const selectedSpace = getSelectedSpace();
+    if (!selectedSpace || !canViewSpaceInfo(selectedSpace)) {
+        alert('Sin autorizacion para eliminar links en este espacio.');
+        return;
+    }
+
     if (!confirm("¿Confirma que desea eliminar el registro seleccionado?")) {
         return;
     }
@@ -886,7 +1022,7 @@ function borrar() {
             if (data.success) {
                 console.log("Registro eliminado");
                 limpiar();
-                updateTable();
+                refreshLinksFromApi().then(() => renderSelectedSpaceLinksInMainTable());
             } else {
                 alert("Error al eliminar");
             }
@@ -941,7 +1077,13 @@ function buscar() {
     }
 
     // Buscar registros por los campos del formulario
-    var categoria = document.getElementById("categoria").value;
+    const selectedSpace = getSelectedSpace();
+    if (!selectedSpace || !canViewSpaceInfo(selectedSpace)) {
+        alert('Sin autorizacion para buscar en este espacio.');
+        return;
+    }
+
+    var categoria = String(selectedSpace.nombre || '').toUpperCase();
     var nombre = document.getElementById("nombre").value;
     var comentario = document.getElementById("comentario").value;
     var direccion = document.getElementById("direccion").value;
@@ -1003,7 +1145,8 @@ function buscar() {
 
 function limpiar() {
     // Función para limpiar el formulario
-    document.getElementById("categoria").value = "";
+    const currentSpace = getSelectedSpace();
+    document.getElementById("categoria").value = currentSpace ? String(currentSpace.nombre || '').toUpperCase() : "";
     document.getElementById("nombre").value = "";
     document.getElementById("comentario").value = "";
     document.getElementById("direccion").value = "";
@@ -1127,43 +1270,20 @@ async function getBackgroundImageDataUrl() {
 }
 
 async function publicar() {
-    if (USE_MULTIUSER_MOCK) {
-        const backgroundImageUrl = await getBackgroundImageDataUrl();
-        const space = getSelectedSpace();
-        if (!space || !canViewSpaceInfo(space)) {
-            const notice = space
-                ? `Sin autorizacion para visualizar links de ${space.nombre}.`
-                : 'Sin autorizacion para visualizar links de este espacio.';
-            const emptyHtml = buildHtmlDocument('Bookmarks', space ? space.nombre : '', [], backgroundImageUrl, notice);
-            downloadHtmlContent('bookmarks.html', emptyHtml);
-            return;
-        }
-
-        const links = mockState.linksBySpace[space.id] || [];
-        const html = buildHtmlDocument(`Bookmarks - ${space.nombre}`, space.nombre, links, backgroundImageUrl);
-        downloadHtmlContent(`bookmarks-${space.nombre}.html`, html);
+    const backgroundImageUrl = await getBackgroundImageDataUrl();
+    const space = getSelectedSpace();
+    if (!space || !canViewSpaceInfo(space)) {
+        const notice = space
+            ? `Sin autorizacion para visualizar links de ${space.nombre}.`
+            : 'Sin autorizacion para visualizar links de este espacio.';
+        const emptyHtml = buildHtmlDocument('Bookmarks', space ? space.nombre : '', [], backgroundImageUrl, notice);
+        downloadHtmlContent('bookmarks.html', emptyHtml);
         return;
     }
 
-    fetch("/api/generar-html", {
-        method: "POST"
-    })
-        .then(response => response.blob())
-        .then(blob => {
-            const url = window.URL.createObjectURL(blob);
-
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "bookmarks.html";
-
-            document.body.appendChild(a);
-            a.click();
-
-            a.remove();
-
-            window.URL.revokeObjectURL(url);
-        })
-        .catch(err => console.log(err));
+    const links = mockState.linksBySpace[space.id] || [];
+    const html = buildHtmlDocument(`Bookmarks - ${space.nombre}`, space.nombre, links, backgroundImageUrl);
+    downloadHtmlContent(`bookmarks-${space.nombre}.html`, html);
 }
 
 function info() {
@@ -1172,27 +1292,7 @@ function info() {
 }
 
 function docs() {
-    if (USE_MULTIUSER_MOCK) {
-        renderOwnerSpacePanel();
-        return;
-    }
-
-    // Función para mostrar información
-    fetch("/api/leeDocs", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: `leeDocs ok`,
-    })
-        .then((data) => {
-            if (data.error) {
-                "Error: " + data.error;
-            }
-        })
-        .catch((error) => {
-            console.log("Error:", error);
-        });
+    renderOwnerSpacePanel();
 }
 
 function log() {
@@ -1200,10 +1300,7 @@ function log() {
 }
 
 function salir() {
-    if (USE_MULTIUSER_MOCK) {
-        hideOwnerSpacePanel();
-        return;
-    }
+    hideOwnerSpacePanel();
 }
 
 // Función que se ejecuta cuando se hace click en una fila de la tabla
