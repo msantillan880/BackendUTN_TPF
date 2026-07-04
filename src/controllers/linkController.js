@@ -2,12 +2,9 @@ import db, { initDatabase } from '../db/database.js';
 import { Link } from '../models/Link.js';
 import { Consulta } from '../db/queries.js';
 import observer from '../utils/observer.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { validarXSS } from '../middleware/xssValidation.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import ServerError from '../Helpers/serverError.helper.js';
+import apiResponse from '../Helpers/apiResponse.helper.js';
 
 const DEMO_MODE = ['1', 'true', 'yes'].includes(String(process.env.DEMO_MODE || '').toLowerCase());
 
@@ -79,9 +76,47 @@ function queryRun(sql, params = []) {
    CONTROLLER
 ========================= */
 
-export class LinkController {
+class LinkController {
 
-  static async obtenerTodos() {
+  async listarLinks(request, response) {
+    const rows = await this.obtenerTodos();
+    return apiResponse.success(response, rows, 'Links obtenidos');
+  }
+
+  async obtenerLinkPorId(request, response) {
+    const row = await this.obtenerPorId(request.params.id);
+
+    if (!row) {
+      throw new ServerError('Link no encontrado', 404);
+    }
+
+    return apiResponse.success(response, row, 'Link obtenido');
+  }
+
+  async crearLink(request, response) {
+    const { categoria, nombre, comentario, direccion } = request.body;
+    const result = await this.crear(categoria, nombre, comentario, direccion);
+    return apiResponse.created(response, result, 'Link creado con exito');
+  }
+
+  async actualizarLink(request, response) {
+    const { categoria, nombre, comentario, direccion } = request.body;
+    const result = await this.actualizar(request.params.id, categoria, nombre, comentario, direccion);
+    return apiResponse.success(response, result, 'Link actualizado con exito');
+  }
+
+  async eliminarLink(request, response) {
+    const result = await this.eliminar(request.params.id);
+    return apiResponse.success(response, result, 'Link eliminado con exito');
+  }
+
+  async buscarLinks(request, response) {
+    const { categoria = '', nombre = '', comentario = '', direccion = '' } = request.body;
+    const rows = await this.buscar(categoria, nombre, comentario, direccion);
+    return apiResponse.success(response, rows, 'Busqueda realizada con exito');
+  }
+
+  async obtenerTodos() {
     if (useMockStore()) {
       return [...mockLinks].sort((a, b) => String(b.categoria).localeCompare(String(a.categoria)));
     }
@@ -90,7 +125,7 @@ export class LinkController {
     return rows || [];
   }
 
-  static async obtenerPorId(id) {
+  async obtenerPorId(id) {
     if (useMockStore()) {
       return getMockById(id);
     }
@@ -98,15 +133,19 @@ export class LinkController {
     return await queryOne(Consulta.FIND_BY_ID, [id]);
   }
 
-  static async crear(categoria, nombre, comentario, direccion) {
-    if (!categoria || !nombre || !direccion) {
-      throw new Error('Campos obligatorios incompletos');
+  async crear(categoria, nombre, comentario, direccion) {
+    const categoriaTexto = String(categoria || '').trim();
+    const nombreTexto = String(nombre || '').trim();
+    const direccionTexto = String(direccion || '').trim();
+
+    if (!categoriaTexto || !nombreTexto || !direccionTexto) {
+      throw new ServerError('Campos obligatorios incompletos', 400);
     }
 
-    const { texto: catLimpia } = validarXSS(categoria.toUpperCase());
-    const { texto: nomLimpia } = validarXSS(nombre);
+    const { texto: catLimpia } = validarXSS(categoriaTexto.toUpperCase());
+    const { texto: nomLimpia } = validarXSS(nombreTexto);
     const { texto: comLimpia } = validarXSS(comentario || '');
-    const { texto: dirLimpia } = validarXSS(direccion);
+    const { texto: dirLimpia } = validarXSS(direccionTexto);
 
     const newLink = new Link(catLimpia, nomLimpia, comLimpia, dirLimpia);
 
@@ -140,18 +179,26 @@ export class LinkController {
     };
   }
 
-  static async actualizar(id, categoria, nombre, comentario, direccion) {
+  async actualizar(id, categoria, nombre, comentario, direccion) {
     const existe = await this.obtenerPorId(id);
-    if (!existe) throw new Error('Link no encontrado');
+    if (!existe) throw new ServerError('Link no encontrado', 404);
 
-    const { texto: catLimpia } = validarXSS(categoria.toUpperCase());
-    const { texto: nomLimpia } = validarXSS(nombre);
+    const categoriaTexto = String(categoria || '').trim();
+    const nombreTexto = String(nombre || '').trim();
+    const direccionTexto = String(direccion || '').trim();
+
+    if (!categoriaTexto || !nombreTexto || !direccionTexto) {
+      throw new ServerError('Campos obligatorios incompletos', 400);
+    }
+
+    const { texto: catLimpia } = validarXSS(categoriaTexto.toUpperCase());
+    const { texto: nomLimpia } = validarXSS(nombreTexto);
     const { texto: comLimpia } = validarXSS(comentario || '');
-    const { texto: dirLimpia } = validarXSS(direccion);
+    const { texto: dirLimpia } = validarXSS(direccionTexto);
 
     if (useMockStore()) {
       const item = getMockById(id);
-      if (!item) throw new Error('Link no encontrado');
+      if (!item) throw new ServerError('Link no encontrado', 404);
 
       item.categoria = catLimpia;
       item.nombre = nomLimpia;
@@ -181,9 +228,9 @@ export class LinkController {
     return { success: true };
   }
 
-  static async eliminar(id) {
+  async eliminar(id) {
     const existe = await this.obtenerPorId(id);
-    if (!existe) throw new Error('Link no encontrado');
+    if (!existe) throw new ServerError('Link no encontrado', 404);
 
     if (useMockStore()) {
       const parsed = Number(id);
@@ -206,7 +253,7 @@ export class LinkController {
     return { success: true };
   }
 
-  static async buscar(categoria = '', nombre = '', comentario = '', direccion = '') {
+  async buscar(categoria = '', nombre = '', comentario = '', direccion = '') {
     // Normalizar entradas
     categoria = String(categoria || '').trim();
     nombre = String(nombre || '').trim();
@@ -217,9 +264,7 @@ export class LinkController {
 
     // Si no hay filtros, devolver error informativo (400)
     if (!categoria && !nombre && !comentario && !direccion) {
-      const err = new Error('Complete al menos un campo para buscar');
-      err.status = 400;
-      throw err;
+      throw new ServerError('Complete al menos un campo para buscar', 400);
     }
 
     // Construir consulta dinámica incluyendo sólo las columnas con filtro
@@ -271,84 +316,8 @@ export class LinkController {
     return rows;
   }
 
-  /* =========================
-     HTML GENERATOR (FIXED)
-  ========================= */
-
-  static async generarHTML() {
-    const rows = useMockStore()
-      ? [...mockLinks].sort((a, b) => String(a.categoria).localeCompare(String(b.categoria)))
-      : await queryAll(Consulta.ORDER_HTML);
-    // Intentar incrustar la imagen de fondo como data URI desde public/images/imagenX.jpg
-    let bgImage = "imagenX.jpg"; // fallback (relative)
-    try {
-      const imgPath = path.join(__dirname, '..', '..', 'public', 'images', 'imagenX.jpg');
-      if (fs.existsSync(imgPath)) {
-        const ext = path.extname(imgPath).toLowerCase();
-        const mime = ext === '.png' ? 'image/png' : ext === '.gif' ? 'image/gif' : 'image/svg' ? 'image/svg+xml' : 'image/jpeg';
-        const data = fs.readFileSync(imgPath).toString('base64');
-        bgImage = `data:${mime};base64,${data}`;
-      }
-    } catch (err) {
-      console.warn('No se pudo leer imagen de fondo para incrustar:', err && err.message);
-    }
-    // Generar HTML más presentable con estilos embebidos
-    let html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Bookmarks</title>
-  <style>
-    /* Background image (incrustada si existe en public/images) */
-    body { font-family: Arial, sans-serif; margin: 0; padding: 24px; background-image: url('${bgImage}'); background-size: cover; background-position: center; background-attachment: fixed; font-size: 18px; }
-    .container { max-width: 1200px; margin: 0 auto; background: rgba(255,255,255,0.95); padding: 24px; border-radius: 8px; box-shadow: 0 0 14px rgba(0,0,0,0.08); }
-    h2 { text-align: center; color: #222; margin: 0 0 16px 0; font-size: 28px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 16px; }
-    th, td { padding: 12px 14px; border: 1px solid #ddd; text-align: left; vertical-align: top; }
-    th { background: #0033cc; color: #fff; font-weight: 700; }
-    tr:nth-child(even) td { background: #f9f9f9; }
-    a { color: #0033cc; text-decoration: none; word-break: break-word; }
-    a:hover { text-decoration: underline; }
-    .small { font-size: 0.95em; color: #666; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h2>Bookmarks</h2>
-    <table>
-      <colgroup>
-        <col style="width:10%">
-        <col style="width:20%">
-        <col style="width:40%">
-        <col style="width:30%">
-      </colgroup>
-      <thead>
-        <tr>
-          <th>Carpeta</th>
-          <th>Nombre</th>
-          <th>Comentario</th>
-          <th>Dirección</th>
-        </tr>
-      </thead>
-      <tbody>`;
-
-    for (const r of rows) {
-      html += `
-        <tr>
-          <td class="small">${r.categoria || ''}</td>
-          <td>${r.nombre || ''}</td>
-          <td>${r.comentario || ''}</td>
-          <td><a href="${r.direccion || '#'}" target="_blank" rel="noopener noreferrer">${r.direccion || ''}</a></td>
-        </tr>`;
-    }
-
-    html += `
-      </tbody>
-    </table>
-  </div>
-</body>
-</html>`;
-
-    return html;
-  }
 }
+
+const linkController = new LinkController();
+
+export default linkController;

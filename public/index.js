@@ -617,8 +617,12 @@ async function requestJson(url, options = {}) {
     }
 
     if (!response.ok) {
-        const message = (data && data.error) || `Error ${response.status}`;
+        const message = (data && (data.message || data.error)) || `Error ${response.status}`;
         throw new Error(message);
+    }
+
+    if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'ok') && Object.prototype.hasOwnProperty.call(data, 'data')) {
+        return data.data;
     }
 
     return data;
@@ -772,7 +776,8 @@ async function initMultiuserMock() {
 function updateTable() {
     fetch("/api/links")
         .then((response) => response.json())
-        .then((data) => {
+        .then((payload) => {
+            const data = (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) ? payload.data : payload;
             console.log("Datos obtenidos:", data);
             const tableBody = document.querySelector(".table-container tbody");
             if (!tableBody) return;
@@ -1106,13 +1111,14 @@ function buscar() {
                 } catch (e) {
                     errData.error = response.statusText || 'Error en la búsqueda';
                 }
-                alert(errData.error || 'Error en la búsqueda');
+                alert(errData.message || errData.error || 'Error en la búsqueda');
                 return null;
             }
             return response.json();
         })
-        .then((data) => {
-            if (!data) return;
+        .then((payload) => {
+            if (!payload) return;
+            const data = (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) ? payload.data : payload;
             const tableBody = document.querySelector(".table-container tbody");
             if (!tableBody) return;
             tableBody.innerHTML = "";
@@ -1270,20 +1276,47 @@ async function getBackgroundImageDataUrl() {
 }
 
 async function publicar() {
-    const backgroundImageUrl = await getBackgroundImageDataUrl();
     const space = getSelectedSpace();
     if (!space || !canViewSpaceInfo(space)) {
-        const notice = space
-            ? `Sin autorizacion para visualizar links de ${space.nombre}.`
-            : 'Sin autorizacion para visualizar links de este espacio.';
-        const emptyHtml = buildHtmlDocument('Bookmarks', space ? space.nombre : '', [], backgroundImageUrl, notice);
-        downloadHtmlContent('bookmarks.html', emptyHtml);
+        alert('Sin autorizacion para generar HTML en este espacio.');
         return;
     }
 
-    const links = mockState.linksBySpace[space.id] || [];
-    const html = buildHtmlDocument(`Bookmarks - ${space.nombre}`, space.nombre, links, backgroundImageUrl);
-    downloadHtmlContent(`bookmarks-${space.nombre}.html`, html);
+    try {
+        const response = await fetch(`/api/espacios/${space.id}/generar-html`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            let message = 'No se pudo generar el HTML';
+            try {
+                const data = await response.json();
+                message = data.message || data.error || message;
+            } catch (e) {
+                message = response.statusText || message;
+            }
+            alert(message);
+            return;
+        }
+
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename=([^;]+)/i);
+        const fallbackName = `bookmarksUTN-${String(space.nombre || 'espacio').replace(/[^a-zA-Z0-9_-]+/g, '_')}.html`;
+        const fileName = match ? match[1].replace(/"/g, '').trim() : fallbackName;
+
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error('Error generando HTML:', error);
+        alert('Error conectando con el servidor');
+    }
 }
 
 function info() {

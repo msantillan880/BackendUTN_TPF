@@ -7,13 +7,16 @@ import { Server } from 'socket.io';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import swaggerUi from 'swagger-ui-express';
 
 import linkRoutes from './routes/linkRoutes.js';
 import espacioRoutes from './routes/espacioRoutes.js';
+import extraRoutes from './routes/extraRoutes.js';
 import { configurarSockets } from './routes/socketRoutes.js';
 import observer from './utils/observer.js';
 import { argentinaTimestamp } from './utils/time.js';
 import logger from './utils/logger.js';
+import swaggerSpec from './config/swagger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,8 +30,15 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
+app.get('/api-docs.json', (req, res) => {
+  res.json(swaggerSpec);
+});
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 app.use('/api', linkRoutes);
 app.use('/api', espacioRoutes);
+app.use('/api', extraRoutes);
 
 configurarSockets(io);
 
@@ -49,7 +59,19 @@ try {
 
 app.use((err, req, res, next) => {
   const status = err.status || 500;
-  res.status(status).json({ error: err.message });
+  const message = err.message || 'Error interno del servidor';
+
+  if (status >= 500) {
+    console.error('Error no controlado:', err);
+  }
+
+  res.status(status).json({
+    ok: false,
+    status,
+    message,
+    error: message,
+    data: null
+  });
 });
 
 const PORT = process.env.PORT || 5000;

@@ -43,14 +43,37 @@ npm start
 
 3. Interactuar con la API o la UI en `public/`.
 
+Documentacion Swagger (para entrega)
+
+- UI interactiva: `GET /api-docs`
+- JSON OpenAPI: `GET /api-docs.json`
+
 Endpoints relevantes
 
-- `GET /api/links` — Obtener todos los links
-- `GET /api/links/:id` — Obtener link por id
-- `POST /api/links` — Crear link
-- `PUT /api/links/:id` — Actualizar link
-- `DELETE /api/links/:id` — Borrar link
-- `POST /api/buscar` — Buscar (envía JSON con campos `categoria`, `nombre`, `comentario`, `direccion`)
+- Links
+  - `GET /api/links` — Obtener todos los links
+  - `GET /api/links/:id` — Obtener link por id
+  - `POST /api/crear` — Crear link
+  - `PUT /api/actualizar/:id` — Actualizar link
+  - `DELETE /api/eliminar/:id` — Borrar link
+  - `POST /api/buscar` — Buscar por filtros (`categoria`, `nombre`, `comentario`, `direccion`)
+- Multiusuario (sin JWT por ahora)
+  - `GET /api/usuarios` — Listar usuarios
+  - `POST /api/usuarios` — Crear usuario
+  - `GET /api/estados-solicitudes` — Listar estados
+  - `GET /api/espacios` — Listar espacios
+  - `GET /api/espacios/:id` — Obtener espacio por id
+  - `POST /api/espacios` — Crear espacio
+  - `GET /api/espacios/:id/miembros` — Listar miembros del espacio
+  - `POST /api/espacios/:id/solicitudes` — Solicitar ingreso
+  - `PUT /api/espacios/:id/solicitudes/:idUsuario/aprobar` — Aprobar solicitud
+  - `PUT /api/espacios/:id/solicitudes/:idUsuario/rechazar` — Rechazar solicitud
+  - `PUT /api/espacios/:id/usuarios/:idUsuario/expulsar` — Expulsar usuario
+- Extras
+  - `POST /api/espacios/:id/generar-html` — Descargar bookmarks del espacio seleccionado
+  - `GET /api/log-view`
+  - `POST /api/leePdf`
+  - `POST /api/leeLog`
 
 Ejemplo de búsqueda (curl):
 

@@ -1,43 +1,87 @@
-import { EspacioService } from '../services/espacioService.js';
+import espacioService from '../services/espacioService.js';
+import ServerError from '../Helpers/serverError.helper.js';
+import apiResponse from '../Helpers/apiResponse.helper.js';
 
-export class EspacioController {
-    static async listarUsuarios() {
-        return EspacioService.listarUsuarios();
+class EspacioController {
+    async listarUsuarios(request, response) {
+        const rows = await espacioService.listarUsuarios();
+        return apiResponse.success(response, rows, 'Usuarios obtenidos');
     }
 
-    static async crearUsuario(nombre, email = null) {
-        return EspacioService.crearUsuario(nombre, email);
+    async crearUsuario(request, response) {
+        const { nombre, email = null } = request.body;
+        const result = await espacioService.crearUsuario(nombre, email);
+        return apiResponse.created(response, result, 'Usuario creado con exito');
     }
 
-    static async listarEstados() {
-        return EspacioService.listarEstados();
+    async listarEstados(request, response) {
+        const rows = await espacioService.listarEstados();
+        return apiResponse.success(response, rows, 'Estados obtenidos');
     }
 
-    static async listarEspacios() {
-        return EspacioService.listarEspacios();
+    async listarEspacios(request, response) {
+        const rows = await espacioService.listarEspacios();
+        return apiResponse.success(response, rows, 'Espacios obtenidos');
     }
 
-    static async obtenerEspacioPorId(idEspacio) {
-        return EspacioService.obtenerEspacioPorId(idEspacio);
+    async obtenerEspacioPorId(request, response) {
+        const row = await espacioService.obtenerEspacioPorId(request.params.id);
+        if (!row) {
+            throw new ServerError('Espacio no encontrado', 404);
+        }
+        return apiResponse.success(response, row, 'Espacio obtenido');
     }
 
-    static async crearEspacio(denominacion, idOwner = null, tipoEspacio = 'publico') {
-        return EspacioService.crearEspacio(denominacion, idOwner, tipoEspacio);
+    async crearEspacio(request, response) {
+        const { denominacion, idOwner = null, tipoEspacio = 0 } = request.body;
+        const result = await espacioService.crearEspacio(denominacion, idOwner, tipoEspacio);
+        return apiResponse.created(response, result, 'Espacio creado con exito');
     }
 
-    static async solicitarIngreso(idEspacio, idUsuario) {
-        return EspacioService.solicitarIngreso(idEspacio, idUsuario);
+    async solicitarIngreso(request, response) {
+        const { idUsuario } = request.body;
+        const result = await espacioService.solicitarIngreso(request.params.id, idUsuario);
+        return apiResponse.created(response, result, 'Solicitud creada con exito');
     }
 
-    static async resolverSolicitud(idEspacio, idUsuario, aprobadoPor, aprobar = true) {
-        return EspacioService.resolverSolicitud(idEspacio, idUsuario, aprobadoPor, aprobar);
+    async aprobarSolicitud(request, response) {
+        const { aprobadoPor } = request.body;
+        const result = await espacioService.resolverSolicitud(
+            request.params.id,
+            request.params.idUsuario,
+            aprobadoPor,
+            true
+        );
+        return apiResponse.success(response, result, 'Solicitud aprobada con exito');
     }
 
-    static async expulsarUsuario(idEspacio, idUsuario, aprobadoPor) {
-        return EspacioService.expulsarUsuario(idEspacio, idUsuario, aprobadoPor);
+    async rechazarSolicitud(request, response) {
+        const { aprobadoPor } = request.body;
+        const result = await espacioService.resolverSolicitud(
+            request.params.id,
+            request.params.idUsuario,
+            aprobadoPor,
+            false
+        );
+        return apiResponse.success(response, result, 'Solicitud rechazada con exito');
     }
 
-    static async listarMiembros(idEspacio) {
-        return EspacioService.listarMiembros(idEspacio);
+    async expulsarUsuario(request, response) {
+        const { aprobadoPor } = request.body;
+        const result = await espacioService.expulsarUsuario(
+            request.params.id,
+            request.params.idUsuario,
+            aprobadoPor
+        );
+        return apiResponse.success(response, result, 'Usuario expulsado con exito');
+    }
+
+    async listarMiembros(request, response) {
+        const rows = await espacioService.listarMiembros(request.params.id);
+        return apiResponse.success(response, rows, 'Miembros obtenidos');
     }
 }
+
+const espacioController = new EspacioController();
+
+export default espacioController;

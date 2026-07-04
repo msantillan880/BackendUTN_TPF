@@ -2,97 +2,345 @@
   "info": {
     "name": "Bookmarks - API",
     "_postman_id": "bookmarks-nodejs-collection",
-    "description": "Colección de ejemplo para importar en Postman: endpoints de la API de Bookmarks",
+    "description": "Coleccion para probar endpoints de links y flujo multiusuario (usuarios, espacios, solicitudes).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "linkId",
+      "value": "1"
+    },
+    {
+      "key": "espacioId",
+      "value": "1"
+    },
+    {
+      "key": "usuarioId",
+      "value": "1"
+    },
+    {
+      "key": "ownerId",
+      "value": "2"
+    }
+  ],
   "item": [
     {
-      "name": "GET /api/links",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": "http://localhost:5000/api/links"
-      },
-      "response": []
-    },
-    {
-      "name": "GET /api/links/:id",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": "http://localhost:5000/api/links/1"
-      },
-      "response": []
-    },
-    {
-      "name": "POST /api/crear",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"categoria\": \"ASTRONOMIA\",\n  \"nombre\": \"Nasa\",\n  \"comentario\": \"Sitio oficial en español\",\n  \"direccion\": \"https://ciencia.nasa.gov/\"\n}"
+      "name": "Links",
+      "item": [
+        {
+          "name": "GET /api/links",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/links"
+          },
+          "response": []
         },
-        "url": "http://localhost:5000/api/crear"
-      },
-      "response": []
-    },
-    {
-      "name": "PUT /api/actualizar/:id",
-      "request": {
-        "method": "PUT",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"categoria\": \"ASTRONOMIA\",\n  \"nombre\": \"Nasa - Actualizado\",\n  \"comentario\": \"Actualizado\",\n  \"direccion\": \"https://ciencia.nasa.gov/\"\n}"
+        {
+          "name": "GET /api/links/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/links/{{linkId}}"
+          },
+          "response": []
         },
-        "url": "http://localhost:5000/api/actualizar/1"
-      },
-      "response": []
-    },
-    {
-      "name": "DELETE /api/eliminar/:id",
-      "request": {
-        "method": "DELETE",
-        "header": [],
-        "url": "http://localhost:5000/api/eliminar/1"
-      },
-      "response": []
-    },
-    {
-      "name": "POST /api/buscar",
-      "request": {
-        "method": "POST",
-        "header": [ { "key": "Content-Type", "value": "application/json" } ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"categoria\": \"ASTRONOMIA\",\n  \"nombre\": \"\",\n  \"comentario\": \"\",\n  \"direccion\": \"\"\n}"
+        {
+          "name": "POST /api/crear",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoria\": \"ASTRONOMIA\",\n  \"nombre\": \"Nasa\",\n  \"comentario\": \"Sitio oficial en espanol\",\n  \"direccion\": \"https://ciencia.nasa.gov/\"\n}"
+            },
+            "url": "{{baseUrl}}/api/crear"
+          },
+          "response": []
         },
-        "url": "http://localhost:5000/api/buscar"
-      },
-      "response": []
+        {
+          "name": "PUT /api/actualizar/:id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoria\": \"ASTRONOMIA\",\n  \"nombre\": \"Nasa - Actualizado\",\n  \"comentario\": \"Actualizado desde Postman\",\n  \"direccion\": \"https://ciencia.nasa.gov/\"\n}"
+            },
+            "url": "{{baseUrl}}/api/actualizar/{{linkId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/eliminar/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/eliminar/{{linkId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/buscar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoria\": \"ASTRONOMIA\",\n  \"nombre\": \"\",\n  \"comentario\": \"\",\n  \"direccion\": \"\"\n}"
+            },
+            "url": "{{baseUrl}}/api/buscar"
+          },
+          "response": []
+        }
+
+      ]
     },
     {
-      "name": "POST /api/generar-html (descarga)",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "url": "http://localhost:5000/api/generar-html"
-      },
-      "response": []
+      "name": "Usuarios",
+      "item": [
+        {
+          "name": "GET /api/usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/usuarios"
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/usuarios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"usuario_postman\",\n  \"email\": \"usuario_postman@mail.com\"\n}"
+            },
+            "url": "{{baseUrl}}/api/usuarios"
+          },
+          "response": []
+        }
+      ]
     },
     {
-      "name": "GET /api/log-view",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": "http://localhost:5000/api/log-view"
-      },
-      "response": []
+      "name": "Espacios",
+      "item": [
+        {
+          "name": "GET /api/espacios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/espacios"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/espacios/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/espacios/{{espacioId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/espacios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"denominacion\": \"Espacio Postman\",\n  \"idOwner\": {{ownerId}},\n  \"tipoEspacio\": \"publico\"\n}"
+            },
+            "url": "{{baseUrl}}/api/espacios"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/espacios/:id/miembros",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/miembros"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Solicitudes",
+      "item": [
+        {
+          "name": "GET /api/estados-solicitudes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/estados-solicitudes"
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/espacios/:id/solicitudes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": {{usuarioId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/solicitudes"
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/espacios/:id/solicitudes/:idUsuario/aprobar",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"aprobadoPor\": {{ownerId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/solicitudes/{{usuarioId}}/aprobar"
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/espacios/:id/solicitudes/:idUsuario/rechazar",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"aprobadoPor\": {{ownerId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/solicitudes/{{usuarioId}}/rechazar"
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/espacios/:id/usuarios/:idUsuario/expulsar",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"aprobadoPor\": {{ownerId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/usuarios/{{usuarioId}}/expulsar"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Extras",
+      "item": [
+        {
+          "name": "POST /api/espacios/:id/generar-html",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/generar-html"
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/leePdf",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/leePdf"
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/leeLog",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/leeLog"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/log-view",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/log-view"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api-docs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api-docs"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api-docs.json",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api-docs.json"
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }
