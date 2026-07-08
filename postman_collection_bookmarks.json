@@ -2,13 +2,59 @@
   "info": {
     "name": "Bookmarks - API",
     "_postman_id": "bookmarks-nodejs-collection",
-    "description": "Coleccion para probar endpoints de links y flujo multiusuario (usuarios, espacios, solicitudes).",
+    "description": "Coleccion para probar autenticacion JWT y flujo multiusuario (usuarios, espacios, solicitudes, links y extras).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
   },
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://localhost:5000"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "ownerEmail",
+      "value": "prueba.usuario2.bookmarksutn@gmail.com"
+    },
+    {
+      "key": "ownerPassword",
+      "value": "bookmarksutn.2026"
+    },
+    {
+      "key": "ownerUserId",
+      "value": ""
+    },
+    {
+      "key": "visitorEmail",
+      "value": "prueba.usuario1.bookmarksutn@gmail.com"
+    },
+    {
+      "key": "visitorPassword",
+      "value": "bookmarksutn.2026"
+    },
+    {
+      "key": "visitorUserId",
+      "value": ""
+    },
+    {
+      "key": "verifyToken",
+      "value": ""
+    },
+    {
+      "key": "resetToken",
+      "value": ""
     },
     {
       "key": "linkId",
@@ -17,17 +63,654 @@
     {
       "key": "espacioId",
       "value": "1"
-    },
-    {
-      "key": "usuarioId",
-      "value": "1"
-    },
-    {
-      "key": "ownerId",
-      "value": "2"
     }
   ],
   "item": [
+    {
+      "name": "Testing",
+      "description": "Flujo sugerido de demo owner/visitante usando las cuentas de Gmail configuradas en variables de colección.",
+      "item": [
+        {
+          "name": "1) Login owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "if (data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "if (data.user && data.user.idUsuario) pm.collectionVariables.set('ownerUserId', String(data.user.idUsuario));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"password\": \"{{ownerPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "2) Owner crea espacio privado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "const id = json && json.data ? json.data.idEspacio : null;",
+                  "if (id) pm.collectionVariables.set('espacioId', String(id));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"denominacion\": \"EspacioDemoGmail\",\n  \"tipoEspacio\": \"privado\"\n}"
+            },
+            "url": "{{baseUrl}}/api/espacios"
+          },
+          "response": []
+        },
+        {
+          "name": "3) Login visitante",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "if (data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "if (data.user && data.user.idUsuario) pm.collectionVariables.set('visitorUserId', String(data.user.idUsuario));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{visitorEmail}}\",\n  \"password\": \"{{visitorPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "4) Visitante solicita ingreso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/solicitudes"
+          },
+          "response": []
+        },
+        {
+          "name": "5) Visitante crea link (esperado 403 si pendiente)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  const id = json && json.data ? json.data.id : null;",
+                  "  if (id) pm.collectionVariables.set('linkId', String(id));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idEspacio\": {{espacioId}},\n  \"nombre\": \"Link visitante pendiente\",\n  \"comentario\": \"Prueba de permisos\",\n  \"direccion\": \"https://example.com\"\n}"
+            },
+            "url": "{{baseUrl}}/api/links"
+          },
+          "response": []
+        },
+        {
+          "name": "6) Login owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "if (data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "if (data.user && data.user.idUsuario) pm.collectionVariables.set('ownerUserId', String(data.user.idUsuario));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"password\": \"{{ownerPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "7) Owner aprueba visitante",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/solicitudes/{{visitorUserId}}/aprobar"
+          },
+          "response": []
+        },
+        {
+          "name": "8) Login visitante",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "if (data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "if (data.user && data.user.idUsuario) pm.collectionVariables.set('visitorUserId', String(data.user.idUsuario));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{visitorEmail}}\",\n  \"password\": \"{{visitorPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "9) Visitante crea link (esperado 201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  const id = json && json.data ? json.data.id : null;",
+                  "  if (id) pm.collectionVariables.set('linkId', String(id));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idEspacio\": {{espacioId}},\n  \"nombre\": \"Link visitante aprobado\",\n  \"comentario\": \"Alta permitida tras aprobacion\",\n  \"direccion\": \"https://example.com/aprobado\"\n}"
+            },
+            "url": "{{baseUrl}}/api/links"
+          },
+          "response": []
+        },
+        {
+          "name": "10) Visitante modifica link (esperado 403)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idEspacio\": {{espacioId}},\n  \"nombre\": \"Intento visitante\",\n  \"comentario\": \"No permitido\",\n  \"direccion\": \"https://example.com/no\"\n}"
+            },
+            "url": "{{baseUrl}}/api/links/{{linkId}}"
+          },
+          "response": []
+        },
+        {
+          "name": "11) Login owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "if (data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "if (data.user && data.user.idUsuario) pm.collectionVariables.set('ownerUserId', String(data.user.idUsuario));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"password\": \"{{ownerPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "12) Owner modifica link (esperado 200)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idEspacio\": {{espacioId}},\n  \"nombre\": \"Actualizado por owner\",\n  \"comentario\": \"Edicion permitida\",\n  \"direccion\": \"https://example.com/owner-ok\"\n}"
+            },
+            "url": "{{baseUrl}}/api/links/{{linkId}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /api/auth/register (owner)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "",
+                  "if (data && data.email) {",
+                  "  pm.collectionVariables.set('ownerEmail', data.email);",
+                  "}",
+                  "",
+                  "if (data && data.verifyUrlDev) {",
+                  "  const match = String(data.verifyUrlDev).match(/[?&]token=([^&#]+)/);",
+                  "  if (match && match[1]) {",
+                  "    pm.collectionVariables.set('verifyToken', decodeURIComponent(match[1]));",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"owner_postman\",\n  \"email\": \"{{ownerEmail}}\",\n  \"password\": \"{{ownerPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/register (visitor)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "",
+                  "if (data && data.email) {",
+                  "  pm.collectionVariables.set('visitorEmail', data.email);",
+                  "}",
+                  "",
+                  "if (data && data.verifyUrlDev) {",
+                  "  const match = String(data.verifyUrlDev).match(/[?&]token=([^&#]+)/);",
+                  "  if (match && match[1]) {",
+                  "    pm.collectionVariables.set('verifyToken', decodeURIComponent(match[1]));",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"visitor_postman\",\n  \"email\": \"{{visitorEmail}}\",\n  \"password\": \"{{visitorPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/auth/verify-email",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/verify-email?token={{verifyToken}}"
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/login (owner)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "",
+                  "if (data.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "}",
+                  "",
+                  "if (data.user && data.user.idUsuario) {",
+                  "  pm.collectionVariables.set('ownerUserId', String(data.user.idUsuario));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"password\": \"{{ownerPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/login (visitor)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "",
+                  "if (data.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "}",
+                  "",
+                  "if (data.user && data.user.idUsuario) {",
+                  "  pm.collectionVariables.set('visitorUserId', String(data.user.idUsuario));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{visitorEmail}}\",\n  \"password\": \"{{visitorPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/auth/me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/me"
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/forgot-password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "",
+                  "if (data && data.resetUrlDev) {",
+                  "  const match = String(data.resetUrlDev).match(/[?&]token=([^&#]+)/);",
+                  "  if (match && match[1]) {",
+                  "    pm.collectionVariables.set('resetToken', decodeURIComponent(match[1]));",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{visitorEmail}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/forgot-password"
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/reset-password",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"newPassword\": \"87654321\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/reset-password"
+          },
+          "response": []
+        }
+      ]
+    },
     {
       "name": "Links",
       "item": [
@@ -50,7 +733,24 @@
           "response": []
         },
         {
-          "name": "POST /api/crear",
+          "name": "POST /api/links",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  const id = json && json.data ? json.data.id : null;",
+                  "  if (id) {",
+                  "    pm.collectionVariables.set('linkId', String(id));",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -61,16 +761,16 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"categoria\": \"ASTRONOMIA\",\n  \"nombre\": \"Nasa\",\n  \"comentario\": \"Sitio oficial en espanol\",\n  \"direccion\": \"https://ciencia.nasa.gov/\"\n}"
+              "raw": "{\n  \"idEspacio\": {{espacioId}},\n  \"nombre\": \"Nasa\",\n  \"comentario\": \"Sitio oficial en espanol\",\n  \"direccion\": \"https://ciencia.nasa.gov/\"\n}"
             },
-            "url": "{{baseUrl}}/api/crear"
+            "url": "{{baseUrl}}/api/links"
           },
           "response": []
         },
         {
-          "name": "PUT /api/actualizar/:id",
+          "name": "PATCH /api/links/:id",
           "request": {
-            "method": "PUT",
+            "method": "PATCH",
             "header": [
               {
                 "key": "Content-Type",
@@ -79,40 +779,30 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"categoria\": \"ASTRONOMIA\",\n  \"nombre\": \"Nasa - Actualizado\",\n  \"comentario\": \"Actualizado desde Postman\",\n  \"direccion\": \"https://ciencia.nasa.gov/\"\n}"
+              "raw": "{\n  \"idEspacio\": {{espacioId}},\n  \"nombre\": \"Nasa - Actualizado\",\n  \"comentario\": \"Actualizado desde Postman\",\n  \"direccion\": \"https://ciencia.nasa.gov/\"\n}"
             },
-            "url": "{{baseUrl}}/api/actualizar/{{linkId}}"
+            "url": "{{baseUrl}}/api/links/{{linkId}}"
           },
           "response": []
         },
         {
-          "name": "DELETE /api/eliminar/:id",
+          "name": "DELETE /api/links/:id",
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": "{{baseUrl}}/api/eliminar/{{linkId}}"
+            "url": "{{baseUrl}}/api/links/{{linkId}}"
           },
           "response": []
         },
         {
-          "name": "POST /api/buscar",
+          "name": "GET /api/links (query)",
           "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"categoria\": \"ASTRONOMIA\",\n  \"nombre\": \"\",\n  \"comentario\": \"\",\n  \"direccion\": \"\"\n}"
-            },
-            "url": "{{baseUrl}}/api/buscar"
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/links?idEspacio={{espacioId}}&nombre=&comentario=&direccion="
           },
           "response": []
         }
-
       ]
     },
     {
@@ -170,6 +860,23 @@
         },
         {
           "name": "POST /api/espacios",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  const id = json && json.data ? json.data.idEspacio : null;",
+                  "  if (id) {",
+                  "    pm.collectionVariables.set('espacioId', String(id));",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -180,7 +887,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"denominacion\": \"Espacio Postman\",\n  \"idOwner\": {{ownerId}},\n  \"tipoEspacio\": \"publico\"\n}"
+              "raw": "{\n  \"denominacion\": \"Espacio Postman\",\n  \"tipoEspacio\": \"privado\"\n}"
             },
             "url": "{{baseUrl}}/api/espacios"
           },
@@ -221,7 +928,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idUsuario\": {{usuarioId}}\n}"
+              "raw": "{}"
             },
             "url": "{{baseUrl}}/api/espacios/{{espacioId}}/solicitudes"
           },
@@ -239,9 +946,9 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"aprobadoPor\": {{ownerId}}\n}"
+              "raw": "{}"
             },
-            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/solicitudes/{{usuarioId}}/aprobar"
+            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/solicitudes/{{visitorUserId}}/aprobar"
           },
           "response": []
         },
@@ -257,9 +964,9 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"aprobadoPor\": {{ownerId}}\n}"
+              "raw": "{}"
             },
-            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/solicitudes/{{usuarioId}}/rechazar"
+            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/solicitudes/{{visitorUserId}}/rechazar"
           },
           "response": []
         },
@@ -275,9 +982,9 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"aprobadoPor\": {{ownerId}}\n}"
+              "raw": "{}"
             },
-            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/usuarios/{{usuarioId}}/expulsar"
+            "url": "{{baseUrl}}/api/espacios/{{espacioId}}/usuarios/{{visitorUserId}}/expulsar"
           },
           "response": []
         }
@@ -325,6 +1032,9 @@
         {
           "name": "GET /api-docs",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api-docs"
@@ -334,6 +1044,9 @@
         {
           "name": "GET /api-docs.json",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api-docs.json"

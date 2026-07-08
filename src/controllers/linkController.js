@@ -5,6 +5,7 @@ import observer from '../utils/observer.js';
 import { validarXSS } from '../middleware/xssValidation.js';
 import ServerError from '../Helpers/serverError.helper.js';
 import apiResponse from '../Helpers/apiResponse.helper.js';
+import espacioService from '../services/espacioService.js';
 
 const DEMO_MODE = ['1', 'true', 'yes'].includes(String(process.env.DEMO_MODE || '').toLowerCase());
 
@@ -56,6 +57,10 @@ function getMockById(id) {
   return mockLinks.find((item) => Number(item.link_id) === parsed) || null;
 }
 
+function normalizeCategoria(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
 /* =========================
    QUERIES HELPERS
 ========================= */
@@ -79,12 +84,48 @@ function queryRun(sql, params = []) {
 class LinkController {
 
   async listarLinks(request, response) {
-    const rows = await this.obtenerTodos();
+    const idUsuario = request.user.idUsuario;
+    const {
+      idEspacio = '',
+      categoria = '',
+      nombre = '',
+      comentario = '',
+      direccion = ''
+    } = request.query || {};
+
+    let categoriaFiltro = String(categoria || '').trim();
+    const espacioFiltro = String(idEspacio || '').trim();
+
+    // Si llega idEspacio, prevalece como criterio canonico y se traduce a categoria interna.
+    if (espacioFiltro) {
+      const permisos = await this.validarPermisoEspacio(idUsuario, espacioFiltro, 'read');
+      categoriaFiltro = permisos.categoria;
+    }
+
+    const hayFiltros = Boolean(
+      categoriaFiltro ||
+      String(nombre || '').trim() ||
+      String(comentario || '').trim() ||
+      String(direccion || '').trim()
+    );
+
+    if (hayFiltros) {
+      const rows = await this.buscar(
+        categoriaFiltro,
+        nombre,
+        comentario,
+        direccion,
+        idUsuario
+      );
+      return apiResponse.success(response, rows, 'Busqueda realizada con exito');
+    }
+
+    const rows = await this.obtenerTodos(idUsuario);
     return apiResponse.success(response, rows, 'Links obtenidos');
   }
 
   async obtenerLinkPorId(request, response) {
-    const row = await this.obtenerPorId(request.params.id);
+    const row = await this.obtenerPorId(request.params.id, request.user.idUsuario, 'read');
 
     if (!row) {
       throw new ServerError('Link no encontrado', 404);
@@ -94,55 +135,122 @@ class LinkController {
   }
 
   async crearLink(request, response) {
-    const { categoria, nombre, comentario, direccion } = request.body;
-    const result = await this.crear(categoria, nombre, comentario, direccion);
+    const { idEspacio = null, nombre, comentario, direccion } = request.body;
+    const result = await this.crear(idEspacio, nombre, comentario, direccion, request.user.idUsuario);
     return apiResponse.created(response, result, 'Link creado con exito');
   }
 
   async actualizarLink(request, response) {
-    const { categoria, nombre, comentario, direccion } = request.body;
-    const result = await this.actualizar(request.params.id, categoria, nombre, comentario, direccion);
+    const { idEspacio = null, nombre, comentario, direccion } = request.body;
+    const result = await this.actualizar(
+      request.params.id,
+      idEspacio,
+      nombre,
+      comentario,
+      direccion,
+      request.user.idUsuario
+    );
     return apiResponse.success(response, result, 'Link actualizado con exito');
   }
 
   async eliminarLink(request, response) {
-    const result = await this.eliminar(request.params.id);
+    const result = await this.eliminar(request.params.id, request.user.idUsuario);
     return apiResponse.success(response, result, 'Link eliminado con exito');
   }
 
   async buscarLinks(request, response) {
     const { categoria = '', nombre = '', comentario = '', direccion = '' } = request.body;
-    const rows = await this.buscar(categoria, nombre, comentario, direccion);
+    const rows = await this.buscar(categoria, nombre, comentario, direccion, request.user.idUsuario);
     return apiResponse.success(response, rows, 'Busqueda realizada con exito');
   }
 
-  async obtenerTodos() {
+  async validarPermisoEspacio(idUsuario, idEspacio, accion = 'read') {
+    const permisos = await espacioService.obtenerPermisosPorEspacio(idUsuario, idEspacio);
+
+    if (!permisos.espacioExiste) {
+      throw new ServerError('Espacio no encontrado', 404);
+    }
+
+    if (accion === 'read' && !permisos.canRead) {
+      throw new ServerError('No tiene permisos para ver links de este espacio', 403);
+    }
+
+    if (accion === 'create' && !permisos.canCreate) {
+      throw new ServerError('No tiene permisos para crear links en este espacio', 403);
+    }
+
+    if (accion === 'manage' && !permisos.canManage) {
+      throw new ServerError('Solo el owner del espacio puede modificar o borrar links', 403);
+    }
+
+    return permisos;
+  }
+
+  async validarPermisoCategoria(idUsuario, categoria, accion = 'read') {
+    const permisos = await espacioService.obtenerPermisosPorCategoria(idUsuario, categoria);
+
+    if (!permisos.espacioExiste) {
+      throw new ServerError('Categoria sin espacio asociado', 403);
+    }
+
+    if (accion === 'read' && !permisos.canRead) {
+      throw new ServerError('No tiene permisos para ver links de este espacio', 403);
+    }
+
+    if (accion === 'create' && !permisos.canCreate) {
+      throw new ServerError('No tiene permisos para crear links en este espacio', 403);
+    }
+
+    if (accion === 'manage' && !permisos.canManage) {
+      throw new ServerError('Solo el owner del espacio puede modificar o borrar links', 403);
+    }
+  }
+
+  async obtenerTodos(idUsuario) {
+    const categoriasAccesibles = await espacioService.listarCategoriasAccesiblesUsuario(idUsuario);
+    const permitidas = new Set(categoriasAccesibles.map((c) => normalizeCategoria(c)));
+
     if (useMockStore()) {
-      return [...mockLinks].sort((a, b) => String(b.categoria).localeCompare(String(a.categoria)));
+      return [...mockLinks]
+        .filter((item) => permitidas.has(normalizeCategoria(item.categoria)))
+        .sort((a, b) => String(b.categoria).localeCompare(String(a.categoria)));
     }
 
     const rows = await queryAll(Consulta.REFRESH);
-    return rows || [];
+    return (rows || []).filter((item) => permitidas.has(normalizeCategoria(item.categoria)));
   }
 
-  async obtenerPorId(id) {
+  async obtenerPorId(id, idUsuario, accion = 'read') {
+    let row = null;
+
     if (useMockStore()) {
-      return getMockById(id);
+      row = getMockById(id);
+    } else {
+      row = await queryOne(Consulta.FIND_BY_ID, [id]);
     }
 
-    return await queryOne(Consulta.FIND_BY_ID, [id]);
+    if (!row) {
+      return null;
+    }
+
+    await this.validarPermisoCategoria(idUsuario, row.categoria, accion);
+
+    return row;
   }
 
-  async crear(categoria, nombre, comentario, direccion) {
-    const categoriaTexto = String(categoria || '').trim();
+  async crear(idEspacio, nombre, comentario, direccion, idUsuario) {
     const nombreTexto = String(nombre || '').trim();
     const direccionTexto = String(direccion || '').trim();
+    const espacioTexto = idEspacio === null || idEspacio === undefined ? '' : String(idEspacio).trim();
 
-    if (!categoriaTexto || !nombreTexto || !direccionTexto) {
+    if (!espacioTexto || !nombreTexto || !direccionTexto) {
       throw new ServerError('Campos obligatorios incompletos', 400);
     }
 
-    const { texto: catLimpia } = validarXSS(categoriaTexto.toUpperCase());
+    const permisos = await this.validarPermisoEspacio(idUsuario, espacioTexto, 'create');
+    const categoriaNormalizada = permisos.categoria;
+
+    const { texto: catLimpia } = validarXSS(categoriaNormalizada);
     const { texto: nomLimpia } = validarXSS(nombreTexto);
     const { texto: comLimpia } = validarXSS(comentario || '');
     const { texto: dirLimpia } = validarXSS(direccionTexto);
@@ -179,19 +287,22 @@ class LinkController {
     };
   }
 
-  async actualizar(id, categoria, nombre, comentario, direccion) {
-    const existe = await this.obtenerPorId(id);
+  async actualizar(id, idEspacio, nombre, comentario, direccion, idUsuario) {
+    const existe = await this.obtenerPorId(id, idUsuario, 'manage');
     if (!existe) throw new ServerError('Link no encontrado', 404);
 
-    const categoriaTexto = String(categoria || '').trim();
     const nombreTexto = String(nombre || '').trim();
     const direccionTexto = String(direccion || '').trim();
+    const espacioTexto = idEspacio === null || idEspacio === undefined ? '' : String(idEspacio).trim();
 
-    if (!categoriaTexto || !nombreTexto || !direccionTexto) {
+    if (!espacioTexto || !nombreTexto || !direccionTexto) {
       throw new ServerError('Campos obligatorios incompletos', 400);
     }
 
-    const { texto: catLimpia } = validarXSS(categoriaTexto.toUpperCase());
+    const permisos = await this.validarPermisoEspacio(idUsuario, espacioTexto, 'manage');
+    const categoriaNormalizada = permisos.categoria;
+
+    const { texto: catLimpia } = validarXSS(categoriaNormalizada);
     const { texto: nomLimpia } = validarXSS(nombreTexto);
     const { texto: comLimpia } = validarXSS(comentario || '');
     const { texto: dirLimpia } = validarXSS(direccionTexto);
@@ -228,8 +339,8 @@ class LinkController {
     return { success: true };
   }
 
-  async eliminar(id) {
-    const existe = await this.obtenerPorId(id);
+  async eliminar(id, idUsuario) {
+    const existe = await this.obtenerPorId(id, idUsuario, 'manage');
     if (!existe) throw new ServerError('Link no encontrado', 404);
 
     if (useMockStore()) {
@@ -253,7 +364,7 @@ class LinkController {
     return { success: true };
   }
 
-  async buscar(categoria = '', nombre = '', comentario = '', direccion = '') {
+  async buscar(categoria = '', nombre = '', comentario = '', direccion = '', idUsuario) {
     // Normalizar entradas
     categoria = String(categoria || '').trim();
     nombre = String(nombre || '').trim();
@@ -266,6 +377,9 @@ class LinkController {
     if (!categoria && !nombre && !comentario && !direccion) {
       throw new ServerError('Complete al menos un campo para buscar', 400);
     }
+
+    const categoriasAccesibles = await espacioService.listarCategoriasAccesiblesUsuario(idUsuario);
+    const permitidas = new Set(categoriasAccesibles.map((c) => normalizeCategoria(c)));
 
     // Construir consulta dinámica incluyendo sólo las columnas con filtro
     const condiciones = [];
@@ -290,15 +404,17 @@ class LinkController {
     let rows = [];
     if (useMockStore()) {
       rows = mockLinks.filter((item) => {
+        const categoriaPermitida = permitidas.has(normalizeCategoria(item.categoria));
         const byCategoria = !categoria || String(item.categoria || '').toLowerCase().includes(categoria.toLowerCase());
         const byNombre = !nombre || String(item.nombre || '').toLowerCase().includes(nombre.toLowerCase());
         const byComentario = !comentario || String(item.comentario || '').toLowerCase().includes(comentario.toLowerCase());
         const byDireccion = !direccion || String(item.direccion || '').toLowerCase().includes(direccion.toLowerCase());
-        return byCategoria && byNombre && byComentario && byDireccion;
+        return categoriaPermitida && byCategoria && byNombre && byComentario && byDireccion;
       }).sort((a, b) => String(a.categoria).localeCompare(String(b.categoria)));
     } else {
       const sql = `SELECT * FROM links WHERE ${condiciones.join(' AND ')} ORDER BY categoria ASC`;
-      rows = await queryAll(sql, params);
+      const found = await queryAll(sql, params);
+      rows = (found || []).filter((item) => permitidas.has(normalizeCategoria(item.categoria)));
     }
 
     // Registrar en observer el criterio de búsqueda (sin exponer datos sensibles)

@@ -9,7 +9,7 @@ const DEFAULT_MOCK_MEMBERSHIPS = [
 ];
 
 const mockState = {
-    currentUserId: 1,
+    currentUserId: null,
     users: [
         { id: 1, nombre: 'usuario1', email: 'usuario1@mail.com' },
         { id: 2, nombre: 'usuario2', email: 'usuario2@mail.com' },
@@ -42,7 +42,111 @@ const mockState = {
     selectedSpaceId: null
 };
 
+const ACCESS_TOKEN_KEY = 'accessToken';
+const authSession = {
+    user: null
+};
+
+function getToken() {
+    return localStorage.getItem(ACCESS_TOKEN_KEY) || '';
+}
+
+function setToken(token) {
+    if (token) {
+        localStorage.setItem(ACCESS_TOKEN_KEY, token);
+        return;
+    }
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+}
+
+function clearToken() {
+    setToken('');
+}
+
+function getAuthHeaders(extraHeaders = {}) {
+    const headers = { ...extraHeaders };
+    const token = getToken();
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+    return headers;
+}
+
+function setAuthStatus(message, isError = false) {
+    const node = document.getElementById('authStatusText');
+    if (!node) return;
+    node.textContent = message || '';
+    node.style.color = isError ? '#9f2f2f' : '#2f4155';
+}
+
+function clearAuthForms() {
+    const loginEmail = document.getElementById('loginEmail');
+    const loginPassword = document.getElementById('loginPassword');
+    const forgotEmail = document.getElementById('forgotEmailMain');
+    const forgotForm = document.getElementById('forgotForm');
+
+    if (loginEmail) loginEmail.value = '';
+    if (loginPassword) loginPassword.value = '';
+    if (forgotEmail) forgotEmail.value = '';
+    if (forgotForm) forgotForm.classList.add('hidden');
+}
+
+function resetAppStateAfterLogout() {
+    authSession.user = null;
+    mockState.currentUserId = null;
+    mockState.selectedSpaceId = null;
+    mockState.spaces = [];
+    mockState.memberships = [];
+    mockState.linksBySpace = {};
+    hideOwnerSpacePanel();
+}
+
+function setAuthenticatedUIState(isAuthenticated) {
+    const authPanel = document.getElementById('authPanel');
+    const topActions = document.querySelector('.mock-top-actions');
+    const formContainer = document.querySelector('.form-container');
+    const buttonContainer = document.querySelector('.button-container');
+    const tableContainer = document.querySelector('.table-container');
+    const logoutButton = document.getElementById('btnLogout');
+    const ownerPanel = document.getElementById('ownerSpacePanel');
+    const spaceForm = document.getElementById('spaceFormContainer');
+
+    if (authPanel) authPanel.classList.toggle('hidden', isAuthenticated);
+    if (topActions) topActions.style.display = isAuthenticated ? '' : 'none';
+    if (formContainer) formContainer.style.display = isAuthenticated ? '' : 'none';
+    if (buttonContainer) buttonContainer.style.display = isAuthenticated ? '' : 'none';
+    if (tableContainer) tableContainer.style.display = isAuthenticated ? '' : 'none';
+    if (logoutButton) logoutButton.style.display = isAuthenticated ? '' : 'none';
+    if (ownerPanel && !isAuthenticated) ownerPanel.classList.add('hidden');
+    if (spaceForm && !isAuthenticated) spaceForm.classList.add('hidden');
+
+    if (!isAuthenticated) {
+        const select = document.getElementById('categoria');
+        if (select) select.innerHTML = '';
+        const tbody = getMainLinksTbody();
+        if (tbody) tbody.innerHTML = '';
+        clearLinkFields();
+    }
+}
+
+async function fetchAuthMe() {
+    const payload = await requestJson('/api/auth/me');
+    const user = payload && payload.user ? payload.user : null;
+    authSession.user = user;
+    return user;
+}
+
 function getCurrentUser() {
+    if (authSession.user) {
+        return {
+            id: Number(authSession.user.idUsuario),
+            nombre: authSession.user.nombre,
+            email: authSession.user.email
+        };
+    }
+    if (!USE_MULTIUSER_MOCK) {
+        return null;
+    }
     return mockState.users.find(u => u.id === mockState.currentUserId) || null;
 }
 
@@ -81,6 +185,7 @@ function canViewSpaceInfo(space) {
 
 function canListSpace(space) {
     if (!space) return false;
+    if (!mockState.currentUserId) return false;
     if (space.ownerId === mockState.currentUserId) return true;
     const membership = getMembership(mockState.currentUserId, space.id);
     if (membership && membership.estado !== 'expulsado') return true;
@@ -142,20 +247,21 @@ function updateActionButtonsVisibility() {
 function renderLoggedUser() {
     const link = document.getElementById('loggedUserLink');
     const user = getCurrentUser();
-    if (!link || !user) return;
-    link.textContent = user.nombre;
-    link.title = `Usuario simulado: ${user.email}`;
-    link.addEventListener('click', (e) => {
-        e.preventDefault();
-        alert(`Usuario simulado: ${user.nombre}\nSin login real en esta etapa.`);
-    });
+    if (!link) return;
 
-    const btnUser1 = document.getElementById('btnUser1');
-    const btnUser2 = document.getElementById('btnUser2');
-    const user1 = mockState.users.find((u) => String(u.nombre || '').toLowerCase() === 'usuario1');
-    const user2 = mockState.users.find((u) => String(u.nombre || '').toLowerCase() === 'usuario2');
-    if (btnUser1) btnUser1.classList.toggle('active', !!user1 && mockState.currentUserId === user1.id);
-    if (btnUser2) btnUser2.classList.toggle('active', !!user2 && mockState.currentUserId === user2.id);
+    if (!user) {
+        link.textContent = '';
+        link.title = '';
+        link.onclick = null;
+        return;
+    }
+
+    link.textContent = user.nombre;
+    link.title = `Usuario autenticado: ${user.email}`;
+    link.onclick = (e) => {
+        e.preventDefault();
+        alert(`Usuario autenticado: ${user.nombre}\nEmail: ${user.email}`);
+    };
 }
 
 function switchMockUser(userId) {
@@ -215,14 +321,13 @@ async function refreshUsersFromApi() {
         email: u.email
     }));
 
-    const user1 = mockState.users.find((u) => String(u.nombre || '').toLowerCase() === 'usuario1');
-    const user2 = mockState.users.find((u) => String(u.nombre || '').toLowerCase() === 'usuario2');
+    const current = getCurrentUser();
+    if (current && Number.isInteger(Number(current.id))) {
+        mockState.currentUserId = Number(current.id);
+        return;
+    }
 
-    if (user1) {
-        mockState.currentUserId = user1.id;
-    } else if (user2) {
-        mockState.currentUserId = user2.id;
-    } else if (mockState.users.length > 0) {
+    if (mockState.users.length > 0) {
         mockState.currentUserId = mockState.users[0].id;
     }
 }
@@ -237,16 +342,32 @@ async function refreshSpacesAndMembershipsFromApi() {
     }));
 
     const allMemberships = [];
+    const seen = new Set();
+
+    function pushMembership(userId, spaceId, estado) {
+        const uid = Number(userId);
+        const sid = Number(spaceId);
+        const normalized = String(estado || '').trim().toLowerCase();
+        if (!uid || !sid || !normalized) return;
+        const key = `${uid}:${sid}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        allMemberships.push({ userId: uid, spaceId: sid, estado: normalized });
+    }
+
     for (const space of mockState.spaces) {
-        const members = await requestJson(`/api/espacios/${space.id}/miembros`);
-        (members || []).forEach((m) => {
-            const estado = String(m.estadoDescripcion || '').trim().toLowerCase();
-            allMemberships.push({
-                userId: Number(m.idUsuario),
-                spaceId: space.id,
-                estado: estado || 'pendiente'
+        const myState = await requestJson(`/api/espacios/${space.id}/mi-estado`);
+        if (myState && myState.estado) {
+            pushMembership(mockState.currentUserId, space.id, myState.estado);
+        }
+
+        if (space.ownerId === mockState.currentUserId) {
+            const members = await requestJson(`/api/espacios/${space.id}/miembros`);
+            (members || []).forEach((m) => {
+                const estado = String(m.estadoDescripcion || '').trim().toLowerCase();
+                pushMembership(m.idUsuario, space.id, estado || 'pendiente');
             });
-        });
+        }
     }
 
     mockState.memberships = allMemberships;
@@ -280,7 +401,6 @@ async function refreshLinksFromApi() {
 }
 
 async function hydrateStateFromApi() {
-    await ensureBaseTestUsers();
     await refreshUsersFromApi();
     await refreshSpacesAndMembershipsFromApi();
     await refreshLinksFromApi();
@@ -370,35 +490,32 @@ function renderOwnerSpacePanel() {
         return;
     }
 
-    const users = mockState.users.filter(u => u.id !== space.ownerId).sort((a, b) => a.id - b.id);
-    users.forEach((u) => {
-        const membership = getMembership(u.id, space.id);
-        const status = membership ? membership.estado : 'pendiente';
+    const miembrosEspacio = mockState.memberships
+        .filter((m) => m.spaceId === space.id && m.userId !== space.ownerId)
+        .sort((a, b) => a.userId - b.userId);
+
+    miembrosEspacio.forEach((membership) => {
+        const u = mockState.users.find((user) => user.id === membership.userId) || {
+            id: membership.userId,
+            nombre: `Usuario ${membership.userId}`,
+            email: ''
+        };
+
+        const status = String(membership.estado || 'pendiente').toLowerCase();
         const row = document.createElement('tr');
 
         row.insertCell(0).textContent = u.nombre;
         row.insertCell(1).textContent = status;
 
         const actionCell = row.insertCell(2);
-        const btn = document.createElement('button');
-        const isApproved = status === 'aprobado';
-        btn.className = `owner-action-btn${isApproved ? ' desauth' : ''}`;
-        btn.textContent = isApproved ? 'Expulsar' : 'Aprobar';
-        btn.addEventListener('click', async () => {
+
+        const ejecutarAccion = async (url, mensajeError) => {
             try {
-                if (isApproved) {
-                    await requestJson(`/api/espacios/${space.id}/usuarios/${u.id}/expulsar`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ aprobadoPor: mockState.currentUserId })
-                    });
-                } else {
-                    await requestJson(`/api/espacios/${space.id}/solicitudes/${u.id}/aprobar`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ aprobadoPor: mockState.currentUserId })
-                    });
-                }
+                await requestJson(url, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ aprobadoPor: mockState.currentUserId })
+                });
 
                 await refreshSpacesAndMembershipsFromApi();
                 renderOwnerSpacePanel();
@@ -407,10 +524,38 @@ function renderOwnerSpacePanel() {
                 renderSelectedSpaceLinksInMainTable();
                 updateActionButtonsVisibility();
             } catch (err) {
-                alert(`No se pudo actualizar autorizacion: ${err.message}`);
+                alert(`${mensajeError}: ${err.message}`);
             }
-        });
-        actionCell.appendChild(btn);
+        };
+
+        if (status === 'pendiente') {
+            const btnAprobar = document.createElement('button');
+            btnAprobar.className = 'owner-action-btn';
+            btnAprobar.textContent = 'Aprobar';
+            btnAprobar.addEventListener('click', () => {
+                ejecutarAccion(`/api/espacios/${space.id}/solicitudes/${u.id}/aprobar`, 'No se pudo aprobar');
+            });
+
+            const btnRechazar = document.createElement('button');
+            btnRechazar.className = 'owner-action-btn desauth';
+            btnRechazar.textContent = 'Rechazar';
+            btnRechazar.addEventListener('click', () => {
+                ejecutarAccion(`/api/espacios/${space.id}/solicitudes/${u.id}/rechazar`, 'No se pudo rechazar');
+            });
+
+            actionCell.appendChild(btnAprobar);
+            actionCell.appendChild(btnRechazar);
+        } else if (status === 'aprobado') {
+            const btnExpulsar = document.createElement('button');
+            btnExpulsar.className = 'owner-action-btn desauth';
+            btnExpulsar.textContent = 'Expulsar';
+            btnExpulsar.addEventListener('click', () => {
+                ejecutarAccion(`/api/espacios/${space.id}/usuarios/${u.id}/expulsar`, 'No se pudo expulsar');
+            });
+            actionCell.appendChild(btnExpulsar);
+        } else {
+            actionCell.textContent = '-';
+        }
 
         tbody.appendChild(row);
     });
@@ -607,7 +752,11 @@ function fillOwnerDefaults() {
 }
 
 async function requestJson(url, options = {}) {
-    const response = await fetch(url, options);
+    const headers = getAuthHeaders(options.headers || {});
+    const response = await fetch(url, {
+        ...options,
+        headers
+    });
     let data = null;
 
     try {
@@ -626,6 +775,121 @@ async function requestJson(url, options = {}) {
     }
 
     return data;
+}
+
+function setupAuthPanel() {
+    const loginForm = document.getElementById('loginForm');
+    const forgotForm = document.getElementById('forgotForm');
+    const forgotLink = document.getElementById('forgotPasswordLink');
+    const forgotCancel = document.getElementById('btnForgotCancel');
+    const loginCancel = document.getElementById('btnLoginCancel');
+    const logoutButton = document.getElementById('btnLogout');
+
+    if (forgotLink && forgotForm) {
+        forgotLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            forgotForm.classList.remove('hidden');
+            const loginEmail = document.getElementById('loginEmail');
+            const forgotEmail = document.getElementById('forgotEmailMain');
+            if (loginEmail && forgotEmail) {
+                forgotEmail.value = loginEmail.value;
+            }
+            setAuthStatus('');
+        });
+    }
+
+    if (forgotCancel && forgotForm) {
+        forgotCancel.addEventListener('click', () => {
+            forgotForm.classList.add('hidden');
+            setAuthStatus('');
+        });
+    }
+
+    if (loginCancel) {
+        loginCancel.addEventListener('click', () => {
+            const email = document.getElementById('loginEmail');
+            const password = document.getElementById('loginPassword');
+            if (email) email.value = '';
+            if (password) password.value = '';
+            if (forgotForm) forgotForm.classList.add('hidden');
+            setAuthStatus('');
+        });
+    }
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = (document.getElementById('loginEmail')?.value || '').trim();
+            const password = document.getElementById('loginPassword')?.value || '';
+
+            if (!email || !password) {
+                setAuthStatus('Complete email y password.', true);
+                return;
+            }
+
+            setAuthStatus('Validando credenciales...');
+
+            try {
+                const result = await requestJson('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const token = result && result.accessToken ? result.accessToken : '';
+                if (!token) {
+                    throw new Error('Login sin token en la respuesta');
+                }
+
+                setToken(token);
+                await fetchAuthMe();
+                await initMultiuserMock();
+                setAuthenticatedUIState(true);
+                setAuthStatus('Sesion iniciada correctamente.');
+            } catch (err) {
+                clearToken();
+                authSession.user = null;
+                setAuthenticatedUIState(false);
+                setAuthStatus(`Error de login: ${err.message}`, true);
+            }
+        });
+    }
+
+    if (forgotForm) {
+        forgotForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = (document.getElementById('forgotEmailMain')?.value || '').trim();
+            if (!email) {
+                setAuthStatus('Ingrese un email para recuperar contraseña.', true);
+                return;
+            }
+
+            try {
+                await requestJson('/api/auth/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                setAuthStatus('Solicitud enviada. Revise su email o resetUrlDev en entorno de prueba.');
+                forgotForm.classList.add('hidden');
+            } catch (err) {
+                setAuthStatus(`No se pudo procesar recuperación: ${err.message}`, true);
+            }
+        });
+    }
+
+    if (logoutButton) {
+        logoutButton.addEventListener('click', () => {
+            clearToken();
+            resetAppStateAfterLogout();
+            renderLoggedUser();
+            setAuthenticatedUIState(false);
+            clearAuthForms();
+            setAuthStatus('Sesion cerrada. Token eliminado.');
+        });
+    }
 }
 
 async function ensureOwnerInDatabase(nombre, email) {
@@ -673,7 +937,7 @@ async function ensureOwnerInDatabase(nombre, email) {
     };
 }
 
-async function createSpaceInDatabase(denominacion, idOwner, tipoEspacio) {
+async function createSpaceInDatabase(denominacion, tipoEspacio) {
     if (USE_MULTIUSER_MOCK) {
         const nextSpaceId = (Math.max(...mockState.spaces.map(s => Number(s.id) || 0), 0) + 1);
         return nextSpaceId;
@@ -682,7 +946,7 @@ async function createSpaceInDatabase(denominacion, idOwner, tipoEspacio) {
     const created = await requestJson('/api/espacios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ denominacion, idOwner, tipoEspacio })
+        body: JSON.stringify({ denominacion, tipoEspacio })
     });
 
     return created && created.idEspacio ? Number(created.idEspacio) : null;
@@ -712,25 +976,17 @@ function setupSpaceForm() {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        const ownerEmail = document.getElementById('ownerEmail').value.trim();
         const spaceName = document.getElementById('spaceName').value.trim();
-        const ownerName = document.getElementById('ownerName').value.trim();
         const spaceType = document.getElementById('spaceType').value;
 
-        if (!ownerEmail || !spaceName || !ownerName) {
-            alert('Complete email owner, nombre espacio y nombre owner.');
+        if (!spaceName) {
+            alert('Complete al menos el nombre del espacio.');
             return;
         }
 
-        let ownerDb = null;
         let persistedSpaceId = null;
         try {
-            ownerDb = await ensureOwnerInDatabase(ownerName, ownerEmail);
-            persistedSpaceId = await createSpaceInDatabase(
-                spaceName,
-                Number(ownerDb.idUsuario),
-                spaceType
-            );
+            persistedSpaceId = await createSpaceInDatabase(spaceName, spaceType);
         } catch (err) {
             alert(`No se pudo guardar en base de datos: ${err.message}`);
             return;
@@ -762,7 +1018,6 @@ async function initMultiuserMock() {
         alert(`No se pudieron cargar datos iniciales desde MySQL: ${err.message}`);
     }
 
-    setupMockUserSwitcher();
     setupOwnerPanelActions();
     renderLoggedUser();
     setupSpaceForm();
@@ -774,10 +1029,8 @@ async function initMultiuserMock() {
 
 // Función para actualizar la tabla
 function updateTable() {
-    fetch("/api/links")
-        .then((response) => response.json())
-        .then((payload) => {
-            const data = (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) ? payload.data : payload;
+    requestJson('/api/links')
+        .then((data) => {
             console.log("Datos obtenidos:", data);
             const tableBody = document.querySelector(".table-container tbody");
             if (!tableBody) return;
@@ -811,12 +1064,29 @@ function updateTable() {
 
 // Actualizar la tabla cuando la página se cargue
 function inicializarEventos() {
-    if (USE_MULTIUSER_MOCK) {
-        initMultiuserMock();
+    setupAuthPanel();
+
+    const token = getToken();
+    if (!token) {
+        setAuthenticatedUIState(false);
+        renderLoggedUser();
+        setAuthStatus('Ingrese su email y password para comenzar.');
         return;
     }
 
-    initMultiuserMock();
+    fetchAuthMe()
+        .then(() => initMultiuserMock())
+        .then(() => {
+            setAuthenticatedUIState(true);
+            setAuthStatus('Sesion restaurada desde token guardado.');
+        })
+        .catch(() => {
+            clearToken();
+            resetAppStateAfterLogout();
+            renderLoggedUser();
+            setAuthenticatedUIState(false);
+            setAuthStatus('Sesion expirada o invalida. Ingrese nuevamente.', true);
+        });
 }
 
 window.onload = inicializarEventos;
@@ -872,25 +1142,22 @@ function crear() {
 
     // Función para crear nuevo registro
     // Obtener los valores de los campos
-    var categoria = String(selectedSpace.nombre || '').toUpperCase();
+    var idEspacio = Number(selectedSpace.id);
     var nombre = document.getElementById("nombre").value;
     var comentario = document.getElementById("comentario").value;
     var direccion = document.getElementById("direccion").value;
 
     // Enviar los datos al servidor usando fetch
-    fetch("api/crear", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
+    requestJson('/api/links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            categoria: categoria,
+            idEspacio: idEspacio,
             nombre: nombre,
             comentario: comentario,
             direccion: direccion,
-        }),
+        })
     })
-        .then((response) => response.json())
         .then((data) => {
             console.log(data);
             if (data.success) {
@@ -903,6 +1170,7 @@ function crear() {
         })
         .catch((error) => {
             console.error("Error:", error);
+            alert(`No se pudo crear el link: ${error.message}`);
         });
 }
 
@@ -948,22 +1216,21 @@ function modificar() {
         return;
     }
 
-    var categoria = String(selectedSpace.nombre || '').toUpperCase();
+    var idEspacio = Number(selectedSpace.id);
     var nombre = document.getElementById("nombre").value;
     var comentario = document.getElementById("comentario").value;
     var direccion = document.getElementById("direccion").value;
 
-    fetch("api/actualizar/" + selectedId, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+    requestJson('/api/links/' + selectedId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            categoria: categoria,
+            idEspacio: idEspacio,
             nombre: nombre,
             comentario: comentario,
             direccion: direccion,
-        }),
+        })
     })
-        .then((response) => response.json())
         .then((data) => {
             console.log(data);
             if (data.success) {
@@ -974,7 +1241,10 @@ function modificar() {
                 alert("Error al actualizar");
             }
         })
-        .catch((error) => console.error("Error:", error));
+        .catch((error) => {
+            console.error("Error:", error);
+            alert(`No se pudo actualizar el link: ${error.message}`);
+        });
 }
 
 function borrar() {
@@ -1020,8 +1290,7 @@ function borrar() {
         return;
     }
 
-    fetch("api/eliminar/" + selectedId, { method: "DELETE" })
-        .then((response) => response.json())
+    requestJson('/api/links/' + selectedId, { method: 'DELETE' })
         .then((data) => {
             console.log(data);
             if (data.success) {
@@ -1032,7 +1301,10 @@ function borrar() {
                 alert("Error al eliminar");
             }
         })
-        .catch((error) => console.error("Error:", error));
+        .catch((error) => {
+            console.error("Error:", error);
+            alert(`No se pudo eliminar el link: ${error.message}`);
+        });
 }
 
 function buscar() {
@@ -1088,37 +1360,20 @@ function buscar() {
         return;
     }
 
-    var categoria = String(selectedSpace.nombre || '').toUpperCase();
     var nombre = document.getElementById("nombre").value;
     var comentario = document.getElementById("comentario").value;
     var direccion = document.getElementById("direccion").value;
-    fetch("api/buscar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            categoria: categoria,
-            nombre: nombre,
-            comentario: comentario,
-            direccion: direccion,
-        }),
+    const query = new URLSearchParams({
+        idEspacio: String(selectedSpace.id),
+        nombre: String(nombre || ''),
+        comentario: String(comentario || ''),
+        direccion: String(direccion || '')
+    });
+
+    requestJson('/api/links?' + query.toString(), {
+        method: 'GET'
     })
-        .then(async (response) => {
-            if (!response.ok) {
-                // intentar leer mensaje del servidor
-                let errData = {};
-                try {
-                    errData = await response.json();
-                } catch (e) {
-                    errData.error = response.statusText || 'Error en la búsqueda';
-                }
-                alert(errData.message || errData.error || 'Error en la búsqueda');
-                return null;
-            }
-            return response.json();
-        })
-        .then((payload) => {
-            if (!payload) return;
-            const data = (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) ? payload.data : payload;
+        .then((data) => {
             const tableBody = document.querySelector(".table-container tbody");
             if (!tableBody) return;
             tableBody.innerHTML = "";
@@ -1145,7 +1400,7 @@ function buscar() {
         })
         .catch((error) => {
             console.error("Error al buscar:", error);
-            alert('Error conectando con el servidor');
+            alert(error.message || 'Error conectando con el servidor');
         });
 }
 
@@ -1284,7 +1539,8 @@ async function publicar() {
 
     try {
         const response = await fetch(`/api/espacios/${space.id}/generar-html`, {
-            method: 'POST'
+            method: 'POST',
+            headers: getAuthHeaders()
         });
 
         if (!response.ok) {
@@ -1333,7 +1589,12 @@ function log() {
 }
 
 function salir() {
-    hideOwnerSpacePanel();
+    clearToken();
+    resetAppStateAfterLogout();
+    renderLoggedUser();
+    setAuthenticatedUIState(false);
+    clearAuthForms();
+    setAuthStatus('Sesion cerrada. Token eliminado.');
 }
 
 // Función que se ejecuta cuando se hace click en una fila de la tabla

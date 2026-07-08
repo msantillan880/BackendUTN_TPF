@@ -25,9 +25,9 @@ const options = {
             schemas: {
                 LinkPayload: {
                     type: 'object',
-                    required: ['categoria', 'nombre', 'direccion'],
+                    required: ['idEspacio', 'nombre', 'direccion'],
                     properties: {
-                        categoria: { type: 'string', example: 'ASTRONOMIA' },
+                        idEspacio: { type: 'integer', example: 3 },
                         nombre: { type: 'string', example: 'NASA' },
                         comentario: { type: 'string', example: 'Sitio oficial' },
                         direccion: { type: 'string', example: 'https://www.nasa.gov' }
@@ -76,9 +76,59 @@ const options = {
             '/api/links': {
                 get: {
                     tags: ['Links'],
-                    summary: 'Listar todos los links',
+                    summary: 'Listar links o buscar por query (REST)',
+                    parameters: [
+                        {
+                            name: 'idEspacio',
+                            in: 'query',
+                            required: false,
+                            schema: { type: 'integer' },
+                            description: 'Filtra por espacio (id numerico).'
+                        },
+                        {
+                            name: 'nombre',
+                            in: 'query',
+                            required: false,
+                            schema: { type: 'string' }
+                        },
+                        {
+                            name: 'comentario',
+                            in: 'query',
+                            required: false,
+                            schema: { type: 'string' }
+                        },
+                        {
+                            name: 'direccion',
+                            in: 'query',
+                            required: false,
+                            schema: { type: 'string' }
+                        },
+                        {
+                            name: 'categoria',
+                            in: 'query',
+                            required: false,
+                            schema: { type: 'string' },
+                            description: 'Compatibilidad legacy. Preferir idEspacio.'
+                        }
+                    ],
                     responses: {
                         200: { description: 'OK' }
+                    }
+                },
+                post: {
+                    tags: ['Links'],
+                    summary: 'Crear link (REST)',
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/LinkPayload' }
+                            }
+                        }
+                    },
+                    responses: {
+                        201: { description: 'Creado' },
+                        400: { description: 'Payload invalido', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } }
                     }
                 }
             },
@@ -98,12 +148,53 @@ const options = {
                         200: { description: 'OK' },
                         404: { description: 'No encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } }
                     }
+                },
+                patch: {
+                    tags: ['Links'],
+                    summary: 'Actualizar link (REST)',
+                    parameters: [
+                        {
+                            name: 'id',
+                            in: 'path',
+                            required: true,
+                            schema: { type: 'integer' }
+                        }
+                    ],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: { $ref: '#/components/schemas/LinkPayload' }
+                            }
+                        }
+                    },
+                    responses: {
+                        200: { description: 'Actualizado' },
+                        404: { description: 'No encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } }
+                    }
+                },
+                delete: {
+                    tags: ['Links'],
+                    summary: 'Eliminar link (REST)',
+                    parameters: [
+                        {
+                            name: 'id',
+                            in: 'path',
+                            required: true,
+                            schema: { type: 'integer' }
+                        }
+                    ],
+                    responses: {
+                        200: { description: 'Eliminado' },
+                        404: { description: 'No encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } }
+                    }
                 }
             },
             '/api/crear': {
                 post: {
                     tags: ['Links'],
-                    summary: 'Crear link',
+                    summary: 'Crear link (legacy, deprecado)',
+                    deprecated: true,
                     requestBody: {
                         required: true,
                         content: {
@@ -121,7 +212,8 @@ const options = {
             '/api/actualizar/{id}': {
                 put: {
                     tags: ['Links'],
-                    summary: 'Actualizar link',
+                    summary: 'Actualizar link (legacy, deprecado)',
+                    deprecated: true,
                     parameters: [
                         {
                             name: 'id',
@@ -147,7 +239,8 @@ const options = {
             '/api/eliminar/{id}': {
                 delete: {
                     tags: ['Links'],
-                    summary: 'Eliminar link',
+                    summary: 'Eliminar link (legacy, deprecado)',
+                    deprecated: true,
                     parameters: [
                         {
                             name: 'id',
@@ -165,7 +258,8 @@ const options = {
             '/api/buscar': {
                 post: {
                     tags: ['Links'],
-                    summary: 'Buscar links por filtros',
+                    summary: 'Buscar links por filtros (legacy, deprecado)',
+                    deprecated: true,
                     requestBody: {
                         required: true,
                         content: {
