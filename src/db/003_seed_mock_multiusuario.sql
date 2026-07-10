@@ -7,16 +7,18 @@
 START TRANSACTION;
 
 -- 1) Usuarios base
-INSERT INTO Usuarios (nombre, email)
+INSERT INTO Usuarios (nombre, email, passwordHash, emailVerificado)
 VALUES
-  ('usuario1', 'usuario1@mail.com'),
-  ('usuario2', 'usuario2@mail.com')
+  ('usuario1', 'prueba.usuario1.bookmarksutn@gmail.com', '$2b$10$nWv7gupsztKGSNUJG7U0U.zjF.EP76zFK.biE4QXJ3c8/n7JZwAd2', 1),
+  ('usuario2', 'prueba.usuario2.bookmarksutn@gmail.com', '$2b$10$Py2SNyENRfB/e4L9iqYpOOLZqfSUXyKobhEFsaKFFoTDXCIidqO0S', 1)
 ON DUPLICATE KEY UPDATE
-  nombre = VALUES(nombre);
+  nombre = VALUES(nombre),
+  passwordHash = VALUES(passwordHash),
+  emailVerificado = VALUES(emailVerificado);
 
 -- Variables de usuarios
-SET @u1 = (SELECT idUsuario FROM Usuarios WHERE email = 'usuario1@mail.com' LIMIT 1);
-SET @u2 = (SELECT idUsuario FROM Usuarios WHERE email = 'usuario2@mail.com' LIMIT 1);
+SET @u1 = (SELECT idUsuario FROM Usuarios WHERE email = 'prueba.usuario1.bookmarksutn@gmail.com' LIMIT 1);
+SET @u2 = (SELECT idUsuario FROM Usuarios WHERE email = 'prueba.usuario2.bookmarksutn@gmail.com' LIMIT 1);
 
 -- 2) Limpiar espacios demo previos (y sus relaciones por FK ON DELETE CASCADE)
 DELETE FROM Espacios WHERE denominacion IN ('Astronomia', 'Ciberseguridad', 'Node.js');
@@ -45,20 +47,20 @@ ON DUPLICATE KEY UPDATE
   f_aprobacion = VALUES(f_aprobacion),
   aprobadoPor = VALUES(aprobadoPor);
 
--- 5) Links demo (3 por espacio/categoria)
-DELETE FROM links WHERE categoria IN ('ASTRONOMIA', 'CIBERSEGURIDAD', 'NODE.JS');
+-- 5) Links demo (3 por espacio)
+DELETE FROM links WHERE idEspacio IN (@e1, @e2, @e3);
 
-INSERT INTO links (categoria, nombre, comentario, direccion) VALUES
-  ('ASTRONOMIA', 'NASA', 'Novedades del espacio', 'https://www.nasa.gov'),
-  ('ASTRONOMIA', 'ESA', 'Agencia Espacial Europea', 'https://www.esa.int'),
-  ('ASTRONOMIA', 'Sky & Telescope', 'Astronomia para aficionados', 'https://skyandtelescope.org'),
+INSERT INTO links (idEspacio, nombre, comentario, direccion) VALUES
+  (@e1, 'NASA', 'Novedades del espacio', 'https://www.nasa.gov'),
+  (@e1, 'ESA', 'Agencia Espacial Europea', 'https://www.esa.int'),
+  (@e1, 'Sky & Telescope', 'Astronomia para aficionados', 'https://skyandtelescope.org'),
 
-  ('CIBERSEGURIDAD', 'OWASP', 'Buenas practicas de seguridad', 'https://owasp.org'),
-  ('CIBERSEGURIDAD', 'CISA', 'Alertas y guias', 'https://www.cisa.gov'),
-  ('CIBERSEGURIDAD', 'HackerOne Blog', 'Vulnerabilidades y reportes', 'https://www.hackerone.com/blog'),
+  (@e2, 'OWASP', 'Buenas practicas de seguridad', 'https://owasp.org'),
+  (@e2, 'CISA', 'Alertas y guias', 'https://www.cisa.gov'),
+  (@e2, 'HackerOne Blog', 'Vulnerabilidades y reportes', 'https://www.hackerone.com/blog'),
 
-  ('NODE.JS', 'Node.js Docs', 'Documentacion oficial', 'https://nodejs.org/en/docs'),
-  ('NODE.JS', 'Express', 'Framework web', 'https://expressjs.com'),
-  ('NODE.JS', 'Socket.IO', 'Tiempo real en web', 'https://socket.io/docs/v4');
+  (@e3, 'Node.js Docs', 'Documentacion oficial', 'https://nodejs.org/en/docs'),
+  (@e3, 'Express', 'Framework web', 'https://expressjs.com'),
+  (@e3, 'Socket.IO', 'Tiempo real en web', 'https://socket.io/docs/v4');
 
 COMMIT;

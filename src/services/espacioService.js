@@ -57,6 +57,29 @@ class EspacioService {
         };
     }
 
+    async eliminarUsuarioConDependencias(idUsuario) {
+        const id = toRequiredInteger(idUsuario, 'idUsuario');
+
+        const user = await this.repository.obtenerUsuarioPorId(id);
+        if (!user) {
+            throw new ServerError('Usuario no encontrado', 404);
+        }
+
+        const result = await this.repository.eliminarUsuarioConDependencias(id);
+
+        if (!result || !result.usuarioEliminado) {
+            throw new ServerError('No se pudo eliminar el usuario', 500);
+        }
+
+        return {
+            success: true,
+            idUsuario: id,
+            espaciosEliminados: result.espaciosEliminados,
+            linksEliminados: result.linksEliminados,
+            espaciosOwnerDetectados: result.espaciosOwnerDetectados
+        };
+    }
+
     async listarEstados() {
         return this.repository.listarEstados();
     }
@@ -105,7 +128,8 @@ class EspacioService {
 
         const usuarioId = toRequiredInteger(idUsuario, 'idUsuario');
 
-        const estadoInicial = String(espacio.tipoEspacio).toLowerCase() === 'publico' ? 2 : 1;
+        // Toda solicitud requiere aprobacion explicita del owner.
+        const estadoInicial = 1;
         const relacion = new EspacioUsuario(usuarioId, espacioId, estadoInicial);
 
         await this.repository.upsertSolicitud(relacion);
@@ -125,6 +149,10 @@ class EspacioService {
         }
 
         const aprobador = toRequiredInteger(aprobadoPor, 'aprobadoPor');
+        const esOwner = await this.repository.isOwner(espacioId, aprobador);
+        if (!esOwner) {
+            throw new ServerError('Solo el owner del espacio puede resolver solicitudes', 403);
+        }
 
         const estado = aprobar ? 2 : 3;
         const result = await this.repository.actualizarEstadoSolicitud(
@@ -146,6 +174,11 @@ class EspacioService {
         const usuarioId = toRequiredInteger(idUsuario, 'idUsuario');
         const aprobador = toRequiredInteger(aprobadoPor, 'aprobadoPor');
 
+        const esOwner = await this.repository.isOwner(espacioId, aprobador);
+        if (!esOwner) {
+            throw new ServerError('Solo el owner del espacio puede expulsar usuarios', 403);
+        }
+
         const result = await this.repository.actualizarEstadoSolicitud(
             4,
             aprobador,
@@ -163,6 +196,164 @@ class EspacioService {
     async listarMiembros(idEspacio) {
         const espacioId = toRequiredInteger(idEspacio, 'idEspacio');
         return this.repository.listarMiembros(espacioId);
+    }
+
+    async listarMiembrosAutorizado(idEspacio, idUsuarioActor) {
+        const espacioId = toRequiredInteger(idEspacio, 'idEspacio');
+        const actorId = toRequiredInteger(idUsuarioActor, 'idUsuarioActor');
+
+        const esOwner = await this.repository.isOwner(espacioId, actorId);
+        if (!esOwner) {
+            throw new ServerError('Solo el owner del espacio puede ver miembros', 403);
+        }
+
+        return this.repository.listarMiembros(espacioId);
+    }
+
+    async obtenerMiEstadoEspacio(idEspacio, idUsuarioActor) {
+        const espacioId = toRequiredInteger(idEspacio, 'idEspacio');
+        const actorId = toRequiredInteger(idUsuarioActor, 'idUsuarioActor');
+
+        const espacio = await this.repository.obtenerEspacioPorId(espacioId);
+        if (!espacio) {
+            throw new ServerError('Espacio no encontrado', 404);
+        }
+
+        const isOwner = await this.repository.isOwner(espacioId, actorId);
+        if (isOwner) {
+            return {
+                idEspacio: espacioId,
+                estado: 'owner',
+                isOwner: true
+            };
+        }
+
+        const relacion = await this.repository.obtenerRelacionUsuarioEspacio(actorId, espacioId);
+        const estadoNum = Number(relacion?.estado);
+        let estado = null;
+
+        if (estadoNum === 1) estado = 'pendiente';
+        else if (estadoNum === 2) estado = 'aprobado';
+        else if (estadoNum === 3) estado = 'rechazado';
+        else if (estadoNum === 4) estado = 'expulsado';
+
+        return {
+            idEspacio: espacioId,
+            estado,
+            isOwner: false
+        };
+    }
+
+    async crearEspacioParaOwner(denominacion, idOwnerActor, tipoEspacio = 'publico') {
+        const owner = toRequiredInteger(idOwnerActor, 'idOwner');
+        return this.crearEspacio(denominacion, owner, tipoEspacio);
+    }
+
+    async solicitarIngresoAutenticado(idEspacio, idUsuarioActor) {
+        const actorId = toRequiredInteger(idUsuarioActor, 'idUsuario');
+        return this.solicitarIngreso(idEspacio, actorId);
+    }
+
+    async resolverSolicitudOwner(idEspacio, idUsuarioObjetivo, idUsuarioActor, aprobar = true) {
+        return this.resolverSolicitud(idEspacio, idUsuarioObjetivo, idUsuarioActor, aprobar);
+    }
+
+    async expulsarUsuarioOwner(idEspacio, idUsuarioObjetivo, idUsuarioActor) {
+        return this.expulsarUsuario(idEspacio, idUsuarioObjetivo, idUsuarioActor);
+    }
+
+    async listarCategoriasAccesiblesUsuario(idUsuario) {
+        const actorId = toRequiredInteger(idUsuario, 'idUsuario');
+        const rows = await this.repository.listarCategoriasAccesiblesUsuario(actorId);
+        return (rows || [])
+            .map((row) => String(row.categoria || '').trim().toUpperCase())
+            .filter(Boolean);
+    }
+
+    async listarIdsEspaciosAccesiblesUsuario(idUsuario) {
+        const actorId = toRequiredInteger(idUsuario, 'idUsuario');
+        const rows = await this.repository.listarCategoriasAccesiblesUsuario(actorId);
+
+        const ids = (rows || [])
+            .map((row) => Number(row.idEspacio))
+            .filter((id) => Number.isInteger(id) && id > 0);
+
+        return [...new Set(ids)];
+    }
+
+    async obtenerPermisosPorCategoria(idUsuario, categoria) {
+        const actorId = toRequiredInteger(idUsuario, 'idUsuario');
+        const categoriaNormalizada = String(categoria || '').trim();
+        if (!categoriaNormalizada) {
+            throw new ServerError('Categoria requerida', 400);
+        }
+
+        const espacio = await this.repository.obtenerEspacioPorCategoriaNormalizada(categoriaNormalizada);
+        if (!espacio) {
+            return {
+                espacioExiste: false,
+                isOwner: false,
+                isApprovedMember: false,
+                canRead: false,
+                canCreate: false,
+                canManage: false
+            };
+        }
+
+        const isOwner = Number(espacio.idOwner) === actorId;
+        const relacion = await this.repository.obtenerRelacionUsuarioEspacio(actorId, espacio.idEspacio);
+        const isApprovedMember = Number(relacion?.estado) === 2;
+
+        const canRead = isOwner || isApprovedMember;
+        const canCreate = isOwner || isApprovedMember;
+        const canManage = isOwner;
+
+        return {
+            espacioExiste: true,
+            idEspacio: Number(espacio.idEspacio),
+            categoria: String(espacio.denominacion || '').trim().toUpperCase(),
+            isOwner,
+            isApprovedMember,
+            canRead,
+            canCreate,
+            canManage
+        };
+    }
+
+    async obtenerPermisosPorEspacio(idUsuario, idEspacio) {
+        const actorId = toRequiredInteger(idUsuario, 'idUsuario');
+        const espacioId = toRequiredInteger(idEspacio, 'idEspacio');
+
+        const espacio = await this.repository.obtenerEspacioPorId(espacioId);
+        if (!espacio) {
+            return {
+                espacioExiste: false,
+                isOwner: false,
+                isApprovedMember: false,
+                canRead: false,
+                canCreate: false,
+                canManage: false
+            };
+        }
+
+        const isOwner = Number(espacio.idOwner) === actorId;
+        const relacion = await this.repository.obtenerRelacionUsuarioEspacio(actorId, espacioId);
+        const isApprovedMember = Number(relacion?.estado) === 2;
+
+        const canRead = isOwner || isApprovedMember;
+        const canCreate = isOwner || isApprovedMember;
+        const canManage = isOwner;
+
+        return {
+            espacioExiste: true,
+            idEspacio: Number(espacio.idEspacio),
+            categoria: String(espacio.denominacion || '').trim().toUpperCase(),
+            isOwner,
+            isApprovedMember,
+            canRead,
+            canCreate,
+            canManage
+        };
     }
 }
 

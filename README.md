@@ -50,6 +50,13 @@ Documentacion Swagger (para entrega)
 
 Endpoints relevantes
 
+- Auth
+  - `POST /api/auth/register` — Registro con `nombre`, `email`, `password`
+  - `GET /api/auth/verify-email?token=...` — Verificacion de email
+  - `POST /api/auth/login` — Login con `email`, `password` (retorna Bearer token)
+  - `POST /api/auth/forgot-password` — Solicitar recuperacion de contrasena
+  - `POST /api/auth/reset-password` — Confirmar nueva contrasena con token
+  - `GET /api/auth/me` — Datos del usuario autenticado (requiere Bearer token)
 - Links
   - `GET /api/links` — Obtener todos los links
   - `GET /api/links/:id` — Obtener link por id
@@ -57,9 +64,9 @@ Endpoints relevantes
   - `PUT /api/actualizar/:id` — Actualizar link
   - `DELETE /api/eliminar/:id` — Borrar link
   - `POST /api/buscar` — Buscar por filtros (`categoria`, `nombre`, `comentario`, `direccion`)
-- Multiusuario (sin JWT por ahora)
+- Multiusuario (protegido con JWT)
   - `GET /api/usuarios` — Listar usuarios
-  - `POST /api/usuarios` — Crear usuario
+  - `DELETE /api/usuarios/:id` — Borrar usuario con dependencias (usuario, espacios owner, relaciones y links de esos espacios)
   - `GET /api/estados-solicitudes` — Listar estados
   - `GET /api/espacios` — Listar espacios
   - `GET /api/espacios/:id` — Obtener espacio por id
@@ -98,6 +105,85 @@ Variables de entorno (opcional, con valores por defecto):
 - `MYSQL_USER` (por defecto `root`)
 - `MYSQL_PASSWORD` (por defecto ``)
 - `MYSQL_DATABASE` (por defecto `bookmarks`)
+
+Variables nuevas para autenticacion/email:
+
+- `JWT_ACCESS_SECRET`
+- `JWT_ACCESS_EXPIRES` (por defecto `15m`)
+- `BCRYPT_SALT_ROUNDS` (por defecto `10`)
+- `EMAIL_VERIFY_TTL_HOURS` (por defecto `24`)
+- `RESET_PASSWORD_TTL_MINUTES` (por defecto `30`)
+- `APP_BASE_URL` (por defecto `http://localhost:5000`)
+- `SMTP_SERVICE`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+
+Nota: si no se configura SMTP, el sistema usa un transporte JSON de desarrollo para poder probar el flujo de verificacion sin envio real.
+
+### Prueba con Gmail (sugerido para profesores)
+
+Para usar dos cuentas de prueba (por ejemplo `usuario1` y `usuario2`) con Gmail:
+
+1. Crear dos cuentas Gmail dedicadas al TP.
+2. Activar verificacion en 2 pasos en cada cuenta.
+3. Generar una App Password por cuenta (Google no recomienda usar password normal de la cuenta).
+4. Configurar en `.env`:
+
+```bash
+SMTP_SERVICE=gmail
+SMTP_USER=tu_cuenta_gmail@gmail.com
+SMTP_PASS=app_password_de_google
+SMTP_FROM="BookmarksUTN <tu_cuenta_gmail@gmail.com>"
+```
+
+Si queres alternar entre cuentas para demo, cambia `SMTP_USER` y `SMTP_PASS` y reinicia el servidor.
+
+## Reglas de autorizacion implementadas
+
+- Owner del espacio:
+  - Puede aprobar/rechazar/expulsar miembros.
+  - Puede modificar y borrar links del espacio.
+  - Puede ver listado de miembros del espacio.
+- Visitante aprobado:
+  - Puede crear links y realizar busquedas/listados en espacios aprobados.
+  - No puede modificar ni borrar links.
+- Usuario no autorizado:
+  - No puede crear links ni ver links de espacios no aprobados.
+
+## Flujo rapido de prueba (Auth)
+
+1. Registrar usuario:
+
+```bash
+curl -s -X POST http://localhost:5000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"nombre":"test","email":"test@mail.com","password":"12345678"}'
+```
+
+2. Tomar `verifyUrlDev` de la respuesta y abrirla (o llamar por curl) para verificar email.
+
+3. Loguear:
+
+```bash
+curl -s -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@mail.com","password":"12345678"}'
+```
+
+4. Usar el `accessToken` en `Authorization: Bearer ...` para endpoints protegidos.
+
+## Prueba desde aplicacion web
+
+- Abrir `http://localhost:5000/auth-demo.html`
+- Esa vista permite probar:
+  - register + verify
+  - login + me
+  - forgot-password + reset-password
+  - llamadas a endpoints protegidos con Bearer token
+
+Tambien en la app principal (`/`) se puede registrar usuario nuevo desde el panel de ingreso:
+
+- Link: `Sos nuevo, registrate aqui` (esquina inferior derecha del panel, arriba de `Recuperar contraseña`).
+- El registro solicita `nombre`, `email` y `password` (password de aplicacion).
+- Luego se envia mail de verificacion y solo cuando el usuario confirma su casilla se habilita login.
 
 Pasos para ejecutar con MySQL:
 

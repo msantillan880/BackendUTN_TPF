@@ -36,15 +36,14 @@ class ExtraController {
     // =========================
     // GENERAR HTML BOOKMARKS POR ESPACIO
     // =========================
-    async generarHTMLPorEspacio(idEspacio) {
+    async generarHTMLPorEspacio(idEspacio, idUsuarioActor) {
         const espacio = await espacioService.obtenerEspacioPorId(idEspacio);
         if (!espacio) {
             throw new ServerError('Espacio no encontrado', 404);
         }
 
         const nombreEspacio = String(espacio.denominacion || '').trim();
-        const categoria = nombreEspacio.toUpperCase();
-        const rows = await linkController.buscar(categoria, '', '', '');
+        const rows = await linkController.buscar(String(idEspacio), '', '', '', idUsuarioActor);
         const rowsOrdenados = [...rows].sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')));
 
         let bgImage = "imagenX.jpg";
@@ -132,7 +131,10 @@ class ExtraController {
     }
 
     async generarHtmlEspacioDescargaHandler(request, response) {
-        const { html, nombreEspacio } = await this.generarHTMLPorEspacio(request.params.id);
+        const { html, nombreEspacio } = await this.generarHTMLPorEspacio(
+            request.params.id,
+            request.user.idUsuario
+        );
         const safeNombre = String(nombreEspacio || 'espacio').replace(/[^a-zA-Z0-9_-]+/g, '_');
         response.setHeader('Content-Type', 'text/html');
         response.setHeader('Content-Disposition', `attachment; filename=bookmarksUTN-${safeNombre}.html`);

@@ -79,16 +79,37 @@ function setAuthStatus(message, isError = false) {
     node.style.color = isError ? '#9f2f2f' : '#2f4155';
 }
 
+function setAuthMode(mode = 'login') {
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const forgotForm = document.getElementById('forgotForm');
+    const registerLink = document.getElementById('registerLink');
+
+    if (loginForm) loginForm.classList.toggle('hidden', mode !== 'login');
+    if (registerForm) registerForm.classList.toggle('hidden', mode !== 'register');
+    if (forgotForm) forgotForm.classList.toggle('hidden', mode !== 'forgot');
+    if (registerLink) registerLink.style.display = mode === 'login' ? '' : 'none';
+}
+
 function clearAuthForms() {
     const loginEmail = document.getElementById('loginEmail');
     const loginPassword = document.getElementById('loginPassword');
     const forgotEmail = document.getElementById('forgotEmailMain');
     const forgotForm = document.getElementById('forgotForm');
+    const registerNombre = document.getElementById('registerNombreMain');
+    const registerEmail = document.getElementById('registerEmailMain');
+    const registerPassword = document.getElementById('registerPasswordMain');
+    const registerForm = document.getElementById('registerForm');
 
     if (loginEmail) loginEmail.value = '';
     if (loginPassword) loginPassword.value = '';
     if (forgotEmail) forgotEmail.value = '';
+    if (registerNombre) registerNombre.value = '';
+    if (registerEmail) registerEmail.value = '';
+    if (registerPassword) registerPassword.value = '';
     if (forgotForm) forgotForm.classList.add('hidden');
+    if (registerForm) registerForm.classList.add('hidden');
+    setAuthMode('login');
 }
 
 function resetAppStateAfterLogout() {
@@ -382,9 +403,8 @@ async function refreshLinksFromApi() {
     });
 
     (links || []).forEach((link) => {
-        const space = mockState.spaces.find(
-            (s) => String(s.nombre || '').toUpperCase() === String(link.categoria || '').toUpperCase()
-        );
+        const spaceId = Number(link.idEspacio);
+        const space = mockState.spaces.find((s) => Number(s.id) === spaceId);
 
         if (!space) return;
 
@@ -779,16 +799,36 @@ async function requestJson(url, options = {}) {
 
 function setupAuthPanel() {
     const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
     const forgotForm = document.getElementById('forgotForm');
+    const registerLink = document.getElementById('registerLink');
     const forgotLink = document.getElementById('forgotPasswordLink');
+    const registerCancel = document.getElementById('btnRegisterCancel');
     const forgotCancel = document.getElementById('btnForgotCancel');
     const loginCancel = document.getElementById('btnLoginCancel');
     const logoutButton = document.getElementById('btnLogout');
 
+    setAuthMode('login');
+
+    if (registerLink && registerForm) {
+        registerLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            setAuthMode('register');
+
+            const loginEmail = document.getElementById('loginEmail');
+            const registerEmail = document.getElementById('registerEmailMain');
+            if (loginEmail && registerEmail) {
+                registerEmail.value = loginEmail.value;
+            }
+
+            setAuthStatus('');
+        });
+    }
+
     if (forgotLink && forgotForm) {
         forgotLink.addEventListener('click', (e) => {
             e.preventDefault();
-            forgotForm.classList.remove('hidden');
+            setAuthMode('forgot');
             const loginEmail = document.getElementById('loginEmail');
             const forgotEmail = document.getElementById('forgotEmailMain');
             if (loginEmail && forgotEmail) {
@@ -798,9 +838,16 @@ function setupAuthPanel() {
         });
     }
 
+    if (registerCancel && registerForm) {
+        registerCancel.addEventListener('click', () => {
+            setAuthMode('login');
+            setAuthStatus('');
+        });
+    }
+
     if (forgotCancel && forgotForm) {
         forgotCancel.addEventListener('click', () => {
-            forgotForm.classList.add('hidden');
+            setAuthMode('login');
             setAuthStatus('');
         });
     }
@@ -811,8 +858,41 @@ function setupAuthPanel() {
             const password = document.getElementById('loginPassword');
             if (email) email.value = '';
             if (password) password.value = '';
-            if (forgotForm) forgotForm.classList.add('hidden');
+            setAuthMode('login');
             setAuthStatus('');
+        });
+    }
+
+    if (registerForm) {
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const nombre = (document.getElementById('registerNombreMain')?.value || '').trim();
+            const email = (document.getElementById('registerEmailMain')?.value || '').trim();
+            const password = document.getElementById('registerPasswordMain')?.value || '';
+
+            if (!nombre || !email || !password) {
+                setAuthStatus('Complete nombre, email y password para registrarse.', true);
+                return;
+            }
+
+            try {
+                await requestJson('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, email, password })
+                });
+
+                const successMessage = 'Registro creado. Revise su casilla y confirme su cuenta para poder ingresar.';
+
+                const loginEmail = document.getElementById('loginEmail');
+                if (loginEmail) loginEmail.value = email;
+
+                setAuthMode('login');
+                setAuthStatus(successMessage);
+            } catch (err) {
+                setAuthStatus(`No se pudo registrar: ${err.message}`, true);
+            }
         });
     }
 
@@ -872,8 +952,8 @@ function setupAuthPanel() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email })
                 });
-                setAuthStatus('Solicitud enviada. Revise su email o resetUrlDev en entorno de prueba.');
-                forgotForm.classList.add('hidden');
+                setAuthStatus('Solicitud enviada. Revise su casilla para continuar con la recuperacion.');
+                setAuthMode('login');
             } catch (err) {
                 setAuthStatus(`No se pudo procesar recuperación: ${err.message}`, true);
             }
@@ -1038,10 +1118,11 @@ function updateTable() {
 
             data.forEach((link) => {
                 const row = tableBody.insertRow();
+                const espacioNombre = link.espacio || link.categoria || '-';
 
                 // Insertar id en la primera celda (se ocultará vía CSS)
                 row.insertCell(0).textContent = link.link_id;
-                row.insertCell(1).textContent = link.categoria;
+                row.insertCell(1).textContent = espacioNombre;
                 row.insertCell(2).textContent = link.nombre;
                 row.insertCell(3).textContent = link.comentario;
                 // Crear link clicable en la columna Direccion
@@ -1379,9 +1460,10 @@ function buscar() {
             tableBody.innerHTML = "";
             data.forEach((link) => {
                 const row = tableBody.insertRow();
+                const espacioNombre = link.espacio || link.categoria || '-';
 
                 row.insertCell(0).textContent = link.link_id;
-                row.insertCell(1).textContent = link.categoria;
+                row.insertCell(1).textContent = espacioNombre;
                 row.insertCell(2).textContent = link.nombre;
                 row.insertCell(3).textContent = link.comentario;
                 const cell4 = row.insertCell(4);

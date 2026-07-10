@@ -12,13 +12,21 @@ import swaggerUi from 'swagger-ui-express';
 import linkRoutes from './routes/linkRoutes.js';
 import espacioRoutes from './routes/espacioRoutes.js';
 import extraRoutes from './routes/extraRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 import { configurarSockets } from './routes/socketRoutes.js';
 import observer from './utils/observer.js';
 import { argentinaTimestamp } from './utils/time.js';
 import logger from './utils/logger.js';
 import swaggerSpec from './config/swagger.js';
+import { initDatabase } from './config/db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+try {
+  await initDatabase();
+} catch (err) {
+  console.error('No se pudo inicializar esquema de base de datos:', err && err.message);
+}
 
 const app = express();
 const server = createServer(app);
@@ -36,8 +44,9 @@ app.get('/api-docs.json', (req, res) => {
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-app.use('/api', linkRoutes);
+app.use('/api', authRoutes);
 app.use('/api', espacioRoutes);
+app.use('/api', linkRoutes);
 app.use('/api', extraRoutes);
 
 configurarSockets(io);

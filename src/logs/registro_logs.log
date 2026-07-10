@@ -81,3 +81,49 @@
 2026-06-25T01:28:28.260 - INFO: 2026-06-25T01:28:28.259 - SID: B-aFe79UVaDklbx0AAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
 2026-06-25T01:28:30.020 - INFO: 2026-06-25T01:28:30.020 - SID: HGwyjSM2847HCwjJAAAD, Navegador: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.112.0 Chrome/142.0.7444.265 Electron/39.8.0 Safari/537.36
 2026-06-25T01:28:37.609 - INFO: 2026-06-25T01:28:37.609 - SID: -Qxh8h_UDbflnhmrAAAF, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-06-25T14:16:56.439 - INFO: 2026-06-25T14:16:56.438 - SID: DI8AiT9nAVIkIZoTAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-06-25T14:19:01.070 - INFO: 2026-06-25T14:19:01.070 - SID: 6SyaV-apl74GE3MuAAAD, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-06-25T14:19:55.302 - INFO: 2026-06-25T14:19:55.302 - SID: iCEtOUkeidNvhxTcAAAF, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-06-25T14:21:36.262 - INFO: 2026-06-25T14:21:36.262 - SID: 7u4UA8CV5EB846tyAAAH, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-06-25T14:24:51.431 - INFO: 2026-06-25T14:24:51.431 - SID: 6xUMlvfWUw5wLd6XAAAJ, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-06-30T21:06:15.354 - INFO: 2026-06-30T21:06:15.354 - SID: 0lNmeYQ-zuiuLEN9AAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-06-30T21:28:08.621 - INFO: 2026-06-30T21:28:08.621 - SID: aCd9Qxydwd6NzpFmAAAD, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-07-04T21:25:02.289 - INFO: 2026-07-04T21:25:02.289 - [CREAR] Nombre: Link Visitante, Comentario: Despues de aprobar, Direccion: https://example.com
+2026-07-04T21:25:02.379 - INFO: 2026-07-04T21:25:02.379 - [MODIFICAR] ID: 11, ANTES: Nombre: Link Visitante, Comentario: Despues de aprobar, Direccion: https://example.com, DESPUES: Nombre: Edit owner, Comentario: Permitido, Direccion: https://example.com/edit
+2026-07-06T15:56:57.540 - INFO: 2026-07-06T15:56:57.539 - SID: CXdbOQFhNaAe_T8iAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-07-06T16:26:49.742 - INFO: 2026-07-06T16:26:49.741 - SID: pmHKrzSVGvbDwfsAAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-07-06T16:26:55.874 - INFO: 2026-07-06T16:26:55.874 - SID: JKnN8OgNR2JLP2-gAAAD, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-07-06T16:46:32.140 - INFO: 2026-07-06T16:46:32.139 - SID: qzeH7sQB9Oi7ziUaAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-07-06T16:46:35.271 - INFO: 2026-07-06T16:46:35.271 - SID: ftoGx-bKM-u8e3oRAAAD, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-07-06T16:47:44.889 - INFO: 2026-07-06T16:47:44.888 - SID: bbSuFCvPgqlt-uUHAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0
+2026-07-07T22:12:24.251 - INFO: 2026-07-07T22:12:24.251 - SID: Lu-w_PpCzwFv70CNAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-07T22:15:50.832 - INFO: 2026-07-07T22:15:50.832 - SID: 3Qprq2QUNdEyX31oAAAD, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T09:02:14.355 - INFO: 2026-07-09T09:02:14.354 - SID: nl8_-8z_HOQ8lnJSAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T09:02:20.545 - INFO: 2026-07-09T09:02:20.545 - SID: tde4Sx9eDEu4h7pBAAAD, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T16:19:01.312 - INFO: 2026-07-09T16:19:01.312 - SID: V4fR6kLidyewb740AAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T20:05:07.617 - INFO: 2026-07-09T20:05:07.616 - SID: BFUrMwQgCQyrxoaZAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T20:05:11.072 - INFO: 2026-07-09T20:05:11.072 - SID: NPGzE5tkMXhqXqyYAAAD, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T20:52:06.148 - INFO: 2026-07-09T20:52:06.147 - SID: ko4FS-avERLjskLwAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T20:52:17.020 - INFO: 2026-07-09T20:52:17.020 - SID: UgrSBBRUZbdrBNmdAAAD, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T22:06:33.791 - INFO: 2026-07-09T22:06:33.790 - SID: JnD9ckWmQtpcoffeAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T22:06:36.430 - INFO: 2026-07-09T22:06:36.430 - SID: skXHus2mUhNcviiVAAAD, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T22:08:08.368 - INFO: 2026-07-09T22:08:08.368 - SID: SoiiWIj-nceozh3IAAAF, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T22:08:27.002 - INFO: 2026-07-09T22:08:27.002 - SID: QejxEbsguMJiOLGYAAAH, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T22:16:45.340 - INFO: 2026-07-09T22:16:45.339 - SID: JHCAlX-FGNj7sluUAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T22:16:54.787 - INFO: 2026-07-09T22:16:54.787 - SID: ZsGoP5Xfw9IJfN1xAAAD, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T22:17:09.277 - INFO: 2026-07-09T22:17:09.277 - SID: _OHo-k_XPFi-wLliAAAF, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T22:17:10.633 - INFO: 2026-07-09T22:17:10.633 - SID: LgIm6sgExKYy9NLNAAAH, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-09T23:51:07.172 - INFO: 2026-07-09T23:51:07.172 - SID: ePkpX-V8NyP6HeYuAAAJ, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-10T00:21:39.379 - INFO: 2026-07-10T00:21:39.378 - SID: LYMG5tkfjKqMQolTAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-10T00:21:45.925 - INFO: 2026-07-10T00:21:45.925 - SID: LhMyPCxXCUfmi_bzAAAD, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-10T00:21:49.759 - INFO: 2026-07-10T00:21:49.759 - SID: gNrOe667NaNXQHADAAAF, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-10T01:16:41.366 - INFO: 2026-07-10T01:16:41.365 - SID: 4fm7jARNigNP3pQFAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-10T01:17:48.430 - INFO: 2026-07-10T01:17:48.430 - SID: 0GkuTBrNxRMcAf9XAAAD, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-10T01:17:52.859 - INFO: 2026-07-10T01:17:52.859 - SID: y9PoC5wy3tsHK2NrAAAF, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-10T01:30:18.561 - INFO: 2026-07-10T01:30:18.561 - SID: xgz_uBuZx2kufEg4AAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-10T01:34:27.363 - INFO: 2026-07-10T01:34:27.362 - SID: uv9IJEzRUT2vesPdAAAB, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-10T01:36:03.563 - INFO: 2026-07-10T01:36:03.563 - SID: DpIOnAQTiJlW57IuAAAD, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-10T01:36:07.843 - INFO: 2026-07-10T01:36:07.843 - SID: vFQH2kljWzIxu119AAAF, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-10T01:36:17.182 - INFO: 2026-07-10T01:36:17.182 - SID: tT_SXBv-NXB_zb0IAAAH, Navegador: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+2026-07-10T01:41:44.339 - INFO: 2026-07-10T01:41:44.339 - [CREAR] Nombre: Sky & Telescope, Comentario: Astronomia para aficionados, Direccion: https://skyandtelescope.org
+2026-07-10T01:42:03.469 - INFO: 2026-07-10T01:42:03.469 - [BORRAR] ID: 4, Nombre: Sky & Telescope, Comentario: Astronomia para aficionados, Direccion: https://skyandtelescope.org

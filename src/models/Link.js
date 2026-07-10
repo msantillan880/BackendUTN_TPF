@@ -3,8 +3,8 @@
  * 
  */
 export class Link {
-  constructor(categoria, nombre, comentario, direccion) {
-    this.categoria = categoria;
+  constructor(idEspacio, nombre, comentario, direccion) {
+    this.idEspacio = idEspacio;
     this.nombre = nombre;
     this.comentario = comentario;
     this.direccion = direccion;
@@ -12,7 +12,7 @@ export class Link {
 
   getInfo() {
     return {
-      categoria: this.categoria,
+      idEspacio: this.idEspacio,
       nombre: this.nombre,
       comentario: this.comentario,
       direccion: this.direccion
@@ -20,6 +20,6 @@ export class Link {
   }
 
   toArray() {
-    return [this.categoria, this.nombre, this.comentario, this.direccion];
+    return [this.idEspacio, this.nombre, this.comentario, this.direccion];
   }
 }

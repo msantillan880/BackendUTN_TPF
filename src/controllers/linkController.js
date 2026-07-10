@@ -12,7 +12,8 @@ const DEMO_MODE = ['1', 'true', 'yes'].includes(String(process.env.DEMO_MODE || 
 const mockLinks = [
   {
     link_id: 1,
-    categoria: 'ASTRONOMIA',
+    idEspacio: 1,
+    espacio: 'ASTRONOMIA',
     nombre: 'NASA',
     comentario: 'Novedades del espacio',
     direccion: 'https://www.nasa.gov',
@@ -20,7 +21,8 @@ const mockLinks = [
   },
   {
     link_id: 2,
-    categoria: 'CIBERSEGURIDAD',
+    idEspacio: 3,
+    espacio: 'CIBERSEGURIDAD',
     nombre: 'OWASP',
     comentario: 'Buenas practicas de seguridad',
     direccion: 'https://owasp.org',
@@ -28,7 +30,8 @@ const mockLinks = [
   },
   {
     link_id: 3,
-    categoria: 'NODE.JS',
+    idEspacio: 4,
+    espacio: 'NODE.JS',
     nombre: 'Node.js Docs',
     comentario: 'Documentacion oficial',
     direccion: 'https://nodejs.org/en/docs',
@@ -57,8 +60,34 @@ function getMockById(id) {
   return mockLinks.find((item) => Number(item.link_id) === parsed) || null;
 }
 
-function normalizeCategoria(value) {
-  return String(value || '').trim().toUpperCase();
+function shapeLinkRow(row) {
+  if (!row) return null;
+
+  const espacioNombre = String(row.espacio || row.espacioNombre || '').trim();
+
+  return {
+    link_id: Number(row.link_id),
+    idEspacio: Number(row.idEspacio),
+    espacio: espacioNombre,
+    // Compatibilidad temporal con frontend antiguo.
+    categoria: espacioNombre,
+    nombre: row.nombre,
+    comentario: row.comentario,
+    direccion: row.direccion,
+    created_at: row.created_at
+  };
+}
+
+function like(text) {
+  return `%${String(text || '').trim()}%`;
+}
+
+function ensurePositiveInteger(value, fieldName) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n <= 0) {
+    throw new ServerError(`${fieldName} invalido`, 400);
+  }
+  return n;
 }
 
 /* =========================
@@ -93,17 +122,19 @@ class LinkController {
       direccion = ''
     } = request.query || {};
 
-    let categoriaFiltro = String(categoria || '').trim();
-    const espacioFiltro = String(idEspacio || '').trim();
+    let idEspacioFiltro = String(idEspacio || '').trim();
+    const categoriaFiltro = String(categoria || '').trim();
 
-    // Si llega idEspacio, prevalece como criterio canonico y se traduce a categoria interna.
-    if (espacioFiltro) {
-      const permisos = await this.validarPermisoEspacio(idUsuario, espacioFiltro, 'read');
-      categoriaFiltro = permisos.categoria;
+    if (!idEspacioFiltro && categoriaFiltro) {
+      const permisos = await espacioService.obtenerPermisosPorCategoria(idUsuario, categoriaFiltro);
+      if (!permisos.espacioExiste || !permisos.canRead) {
+        throw new ServerError('No tiene permisos para ver links de este espacio', 403);
+      }
+      idEspacioFiltro = String(permisos.idEspacio);
     }
 
     const hayFiltros = Boolean(
-      categoriaFiltro ||
+      idEspacioFiltro ||
       String(nombre || '').trim() ||
       String(comentario || '').trim() ||
       String(direccion || '').trim()
@@ -111,11 +142,12 @@ class LinkController {
 
     if (hayFiltros) {
       const rows = await this.buscar(
-        categoriaFiltro,
+        idEspacioFiltro,
         nombre,
         comentario,
         direccion,
-        idUsuario
+        idUsuario,
+        categoriaFiltro
       );
       return apiResponse.success(response, rows, 'Busqueda realizada con exito');
     }
@@ -159,8 +191,8 @@ class LinkController {
   }
 
   async buscarLinks(request, response) {
-    const { categoria = '', nombre = '', comentario = '', direccion = '' } = request.body;
-    const rows = await this.buscar(categoria, nombre, comentario, direccion, request.user.idUsuario);
+    const { idEspacio = '', categoria = '', nombre = '', comentario = '', direccion = '' } = request.body;
+    const rows = await this.buscar(idEspacio, nombre, comentario, direccion, request.user.idUsuario, categoria);
     return apiResponse.success(response, rows, 'Busqueda realizada con exito');
   }
 
@@ -186,38 +218,36 @@ class LinkController {
     return permisos;
   }
 
-  async validarPermisoCategoria(idUsuario, categoria, accion = 'read') {
-    const permisos = await espacioService.obtenerPermisosPorCategoria(idUsuario, categoria);
-
-    if (!permisos.espacioExiste) {
-      throw new ServerError('Categoria sin espacio asociado', 403);
-    }
-
-    if (accion === 'read' && !permisos.canRead) {
-      throw new ServerError('No tiene permisos para ver links de este espacio', 403);
-    }
-
-    if (accion === 'create' && !permisos.canCreate) {
-      throw new ServerError('No tiene permisos para crear links en este espacio', 403);
-    }
-
-    if (accion === 'manage' && !permisos.canManage) {
-      throw new ServerError('Solo el owner del espacio puede modificar o borrar links', 403);
-    }
-  }
-
   async obtenerTodos(idUsuario) {
-    const categoriasAccesibles = await espacioService.listarCategoriasAccesiblesUsuario(idUsuario);
-    const permitidas = new Set(categoriasAccesibles.map((c) => normalizeCategoria(c)));
+    const idsEspacios = await espacioService.listarIdsEspaciosAccesiblesUsuario(idUsuario);
+    if (!idsEspacios.length) return [];
 
     if (useMockStore()) {
+      const permitidas = new Set(idsEspacios.map(Number));
       return [...mockLinks]
-        .filter((item) => permitidas.has(normalizeCategoria(item.categoria)))
-        .sort((a, b) => String(b.categoria).localeCompare(String(a.categoria)));
+        .filter((item) => permitidas.has(Number(item.idEspacio)))
+        .sort((a, b) => String(a.espacio || '').localeCompare(String(b.espacio || '')))
+        .map(shapeLinkRow);
     }
 
-    const rows = await queryAll(Consulta.REFRESH);
-    return (rows || []).filter((item) => permitidas.has(normalizeCategoria(item.categoria)));
+    const placeholders = idsEspacios.map(() => '?').join(', ');
+    const sql = `
+      SELECT
+        l.link_id,
+        l.idEspacio,
+        e.denominacion AS espacio,
+        l.nombre,
+        l.comentario,
+        l.direccion,
+        l.created_at
+      FROM links l
+      INNER JOIN Espacios e ON e.idEspacio = l.idEspacio
+      WHERE l.idEspacio IN (${placeholders})
+      ORDER BY e.denominacion DESC, l.link_id DESC
+    `;
+
+    const rows = await queryAll(sql, idsEspacios);
+    return (rows || []).map(shapeLinkRow);
   }
 
   async obtenerPorId(id, idUsuario, accion = 'read') {
@@ -233,34 +263,34 @@ class LinkController {
       return null;
     }
 
-    await this.validarPermisoCategoria(idUsuario, row.categoria, accion);
+    const shaped = shapeLinkRow(row);
+    await this.validarPermisoEspacio(idUsuario, shaped.idEspacio, accion);
 
-    return row;
+    return shaped;
   }
 
   async crear(idEspacio, nombre, comentario, direccion, idUsuario) {
+    const espacioId = ensurePositiveInteger(idEspacio, 'idEspacio');
     const nombreTexto = String(nombre || '').trim();
     const direccionTexto = String(direccion || '').trim();
-    const espacioTexto = idEspacio === null || idEspacio === undefined ? '' : String(idEspacio).trim();
 
-    if (!espacioTexto || !nombreTexto || !direccionTexto) {
+    if (!nombreTexto || !direccionTexto) {
       throw new ServerError('Campos obligatorios incompletos', 400);
     }
 
-    const permisos = await this.validarPermisoEspacio(idUsuario, espacioTexto, 'create');
-    const categoriaNormalizada = permisos.categoria;
+    const permisos = await this.validarPermisoEspacio(idUsuario, espacioId, 'create');
 
-    const { texto: catLimpia } = validarXSS(categoriaNormalizada);
     const { texto: nomLimpia } = validarXSS(nombreTexto);
     const { texto: comLimpia } = validarXSS(comentario || '');
     const { texto: dirLimpia } = validarXSS(direccionTexto);
 
-    const newLink = new Link(catLimpia, nomLimpia, comLimpia, dirLimpia);
+    const newLink = new Link(espacioId, nomLimpia, comLimpia, dirLimpia);
 
     if (useMockStore()) {
       const item = {
         link_id: nextMockId++,
-        categoria: newLink.categoria,
+        idEspacio: espacioId,
+        espacio: permisos.categoria,
         nombre: newLink.nombre,
         comentario: newLink.comentario,
         direccion: newLink.direccion,
@@ -278,7 +308,6 @@ class LinkController {
 
     const result = await queryRun(Consulta.INSERT_LINK, newLink.toArray());
 
-    // Notificar con datos completos: Nombre, Comentario, Direccion (separados por comas)
     observer.notificar(`[CREAR] Nombre: ${nomLimpia}, Comentario: ${comLimpia}, Direccion: ${dirLimpia}`);
 
     return {
@@ -291,18 +320,16 @@ class LinkController {
     const existe = await this.obtenerPorId(id, idUsuario, 'manage');
     if (!existe) throw new ServerError('Link no encontrado', 404);
 
+    const espacioId = ensurePositiveInteger(idEspacio, 'idEspacio');
     const nombreTexto = String(nombre || '').trim();
     const direccionTexto = String(direccion || '').trim();
-    const espacioTexto = idEspacio === null || idEspacio === undefined ? '' : String(idEspacio).trim();
 
-    if (!espacioTexto || !nombreTexto || !direccionTexto) {
+    if (!nombreTexto || !direccionTexto) {
       throw new ServerError('Campos obligatorios incompletos', 400);
     }
 
-    const permisos = await this.validarPermisoEspacio(idUsuario, espacioTexto, 'manage');
-    const categoriaNormalizada = permisos.categoria;
+    const permisos = await this.validarPermisoEspacio(idUsuario, espacioId, 'manage');
 
-    const { texto: catLimpia } = validarXSS(categoriaNormalizada);
     const { texto: nomLimpia } = validarXSS(nombreTexto);
     const { texto: comLimpia } = validarXSS(comentario || '');
     const { texto: dirLimpia } = validarXSS(direccionTexto);
@@ -311,13 +338,14 @@ class LinkController {
       const item = getMockById(id);
       if (!item) throw new ServerError('Link no encontrado', 404);
 
-      item.categoria = catLimpia;
+      item.idEspacio = espacioId;
+      item.espacio = permisos.categoria;
       item.nombre = nomLimpia;
       item.comentario = comLimpia;
       item.direccion = dirLimpia;
     } else {
       await queryRun(Consulta.UPDATE, [
-        catLimpia,
+        espacioId,
         nomLimpia,
         comLimpia,
         dirLimpia,
@@ -325,14 +353,12 @@ class LinkController {
       ]);
     }
 
-    // Incluir valores antes y despues de la modificación
     try {
       const antes = existe || {};
       const antesStr = `Nombre: ${antes.nombre || ''}, Comentario: ${antes.comentario || ''}, Direccion: ${antes.direccion || ''}`;
       const despuesStr = `Nombre: ${nomLimpia}, Comentario: ${comLimpia}, Direccion: ${dirLimpia}`;
       observer.notificar(`[MODIFICAR] ID: ${id}, ANTES: ${antesStr}, DESPUES: ${despuesStr}`);
-    } catch (err) {
-      // Si algo falla, mantener el comportamiento anterior
+    } catch (_err) {
       observer.notificar(`[MODIFICAR] ${nomLimpia}`);
     }
 
@@ -353,83 +379,103 @@ class LinkController {
       await queryRun(Consulta.DELETE, [id]);
     }
 
-    // Incluir datos del registro borrado
     try {
       const antes = existe || {};
       observer.notificar(`[BORRAR] ID: ${id}, Nombre: ${antes.nombre || ''}, Comentario: ${antes.comentario || ''}, Direccion: ${antes.direccion || ''}`);
-    } catch (err) {
+    } catch (_err) {
       observer.notificar(`[BORRAR] ${id}`);
     }
 
     return { success: true };
   }
 
-  async buscar(categoria = '', nombre = '', comentario = '', direccion = '', idUsuario) {
-    // Normalizar entradas
-    categoria = String(categoria || '').trim();
-    nombre = String(nombre || '').trim();
-    comentario = String(comentario || '').trim();
-    direccion = String(direccion || '').trim();
+  async buscar(idEspacio = '', nombre = '', comentario = '', direccion = '', idUsuario, categoria = '') {
+    const espacioRaw = String(idEspacio || '').trim();
+    const categoriaRaw = String(categoria || '').trim();
+    const nombreRaw = String(nombre || '').trim();
+    const comentarioRaw = String(comentario || '').trim();
+    const direccionRaw = String(direccion || '').trim();
 
-    const like = (t) => `%${t}%`;
-
-    // Si no hay filtros, devolver error informativo (400)
-    if (!categoria && !nombre && !comentario && !direccion) {
+    if (!espacioRaw && !categoriaRaw && !nombreRaw && !comentarioRaw && !direccionRaw) {
       throw new ServerError('Complete al menos un campo para buscar', 400);
     }
 
-    const categoriasAccesibles = await espacioService.listarCategoriasAccesiblesUsuario(idUsuario);
-    const permitidas = new Set(categoriasAccesibles.map((c) => normalizeCategoria(c)));
+    let idsPermitidos = await espacioService.listarIdsEspaciosAccesiblesUsuario(idUsuario);
+    if (!idsPermitidos.length) return [];
 
-    // Construir consulta dinámica incluyendo sólo las columnas con filtro
-    const condiciones = [];
-    const params = [];
-    if (categoria) {
-      condiciones.push('categoria LIKE ?');
-      params.push(like(categoria));
-    }
-    if (nombre) {
-      condiciones.push('nombre LIKE ?');
-      params.push(like(nombre));
-    }
-    if (comentario) {
-      condiciones.push('comentario LIKE ?');
-      params.push(like(comentario));
-    }
-    if (direccion) {
-      condiciones.push('direccion LIKE ?');
-      params.push(like(direccion));
+    if (espacioRaw) {
+      const permisos = await this.validarPermisoEspacio(idUsuario, espacioRaw, 'read');
+      idsPermitidos = [Number(permisos.idEspacio)];
+    } else if (categoriaRaw) {
+      const permisos = await espacioService.obtenerPermisosPorCategoria(idUsuario, categoriaRaw);
+      if (!permisos.espacioExiste || !permisos.canRead) {
+        throw new ServerError('No tiene permisos para ver links de este espacio', 403);
+      }
+      idsPermitidos = [Number(permisos.idEspacio)];
     }
 
-    let rows = [];
     if (useMockStore()) {
-      rows = mockLinks.filter((item) => {
-        const categoriaPermitida = permitidas.has(normalizeCategoria(item.categoria));
-        const byCategoria = !categoria || String(item.categoria || '').toLowerCase().includes(categoria.toLowerCase());
-        const byNombre = !nombre || String(item.nombre || '').toLowerCase().includes(nombre.toLowerCase());
-        const byComentario = !comentario || String(item.comentario || '').toLowerCase().includes(comentario.toLowerCase());
-        const byDireccion = !direccion || String(item.direccion || '').toLowerCase().includes(direccion.toLowerCase());
-        return categoriaPermitida && byCategoria && byNombre && byComentario && byDireccion;
-      }).sort((a, b) => String(a.categoria).localeCompare(String(b.categoria)));
-    } else {
-      const sql = `SELECT * FROM links WHERE ${condiciones.join(' AND ')} ORDER BY categoria ASC`;
-      const found = await queryAll(sql, params);
-      rows = (found || []).filter((item) => permitidas.has(normalizeCategoria(item.categoria)));
+      const permitidas = new Set(idsPermitidos.map(Number));
+      const rows = mockLinks.filter((item) => {
+        const byEspacio = permitidas.has(Number(item.idEspacio));
+        const byNombre = !nombreRaw || String(item.nombre || '').toLowerCase().includes(nombreRaw.toLowerCase());
+        const byComentario = !comentarioRaw || String(item.comentario || '').toLowerCase().includes(comentarioRaw.toLowerCase());
+        const byDireccion = !direccionRaw || String(item.direccion || '').toLowerCase().includes(direccionRaw.toLowerCase());
+        return byEspacio && byNombre && byComentario && byDireccion;
+      }).sort((a, b) => String(a.espacio || '').localeCompare(String(b.espacio || '')));
+
+      return rows.map(shapeLinkRow);
     }
 
-    // Registrar en observer el criterio de búsqueda (sin exponer datos sensibles)
+    const params = [];
+    const where = [];
+
+    const placeholders = idsPermitidos.map(() => '?').join(', ');
+    where.push(`l.idEspacio IN (${placeholders})`);
+    params.push(...idsPermitidos);
+
+    if (nombreRaw) {
+      where.push('l.nombre LIKE ?');
+      params.push(like(nombreRaw));
+    }
+    if (comentarioRaw) {
+      where.push('l.comentario LIKE ?');
+      params.push(like(comentarioRaw));
+    }
+    if (direccionRaw) {
+      where.push('l.direccion LIKE ?');
+      params.push(like(direccionRaw));
+    }
+
+    const sql = `
+      SELECT
+        l.link_id,
+        l.idEspacio,
+        e.denominacion AS espacio,
+        l.nombre,
+        l.comentario,
+        l.direccion,
+        l.created_at
+      FROM links l
+      INNER JOIN Espacios e ON e.idEspacio = l.idEspacio
+      WHERE ${where.join(' AND ')}
+      ORDER BY e.denominacion ASC, l.nombre ASC
+    `;
+
+    const rows = await queryAll(sql, params);
+
     try {
       const criterios = [];
-      if (categoria) criterios.push(`categoria:${categoria}`);
-      if (nombre) criterios.push(`nombre:${nombre}`);
-      if (comentario) criterios.push(`comentario:${comentario}`);
-      if (direccion) criterios.push(`direccion:${direccion}`);
+      if (idsPermitidos.length === 1) criterios.push(`idEspacio:${idsPermitidos[0]}`);
+      if (nombreRaw) criterios.push(`nombre:${nombreRaw}`);
+      if (comentarioRaw) criterios.push(`comentario:${comentarioRaw}`);
+      if (direccionRaw) criterios.push(`direccion:${direccionRaw}`);
       observer.notificar(`[BUSCAR] ${criterios.join('|')}`);
-    } catch (err) {
-      console.error('Error notificando observador en buscar:', err);
+    } catch (_err) {
+      // No interrumpir flujo por logging.
     }
 
-    return rows;
+    return (rows || []).map(shapeLinkRow);
   }
 
 }

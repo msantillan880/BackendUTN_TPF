@@ -1,5 +1,6 @@
 node_modules/
 .qodo
+.env
 *.db-shm
 *.db-wal
 # Local notas

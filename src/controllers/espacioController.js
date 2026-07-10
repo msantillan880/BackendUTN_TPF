@@ -14,6 +14,11 @@ class EspacioController {
         return apiResponse.created(response, result, 'Usuario creado con exito');
     }
 
+    async eliminarUsuario(request, response) {
+        const result = await espacioService.eliminarUsuarioConDependencias(request.params.id);
+        return apiResponse.success(response, result, 'Usuario eliminado con todas sus dependencias');
+    }
+
     async listarEstados(request, response) {
         const rows = await espacioService.listarEstados();
         return apiResponse.success(response, rows, 'Estados obtenidos');
@@ -33,52 +38,66 @@ class EspacioController {
     }
 
     async crearEspacio(request, response) {
-        const { denominacion, idOwner = null, tipoEspacio = 0 } = request.body;
-        const result = await espacioService.crearEspacio(denominacion, idOwner, tipoEspacio);
+        const { denominacion, tipoEspacio = 0 } = request.body;
+        const result = await espacioService.crearEspacioParaOwner(
+            denominacion,
+            request.user.idUsuario,
+            tipoEspacio
+        );
         return apiResponse.created(response, result, 'Espacio creado con exito');
     }
 
     async solicitarIngreso(request, response) {
-        const { idUsuario } = request.body;
-        const result = await espacioService.solicitarIngreso(request.params.id, idUsuario);
+        const result = await espacioService.solicitarIngresoAutenticado(
+            request.params.id,
+            request.user.idUsuario
+        );
         return apiResponse.created(response, result, 'Solicitud creada con exito');
     }
 
     async aprobarSolicitud(request, response) {
-        const { aprobadoPor } = request.body;
-        const result = await espacioService.resolverSolicitud(
+        const result = await espacioService.resolverSolicitudOwner(
             request.params.id,
             request.params.idUsuario,
-            aprobadoPor,
+            request.user.idUsuario,
             true
         );
         return apiResponse.success(response, result, 'Solicitud aprobada con exito');
     }
 
     async rechazarSolicitud(request, response) {
-        const { aprobadoPor } = request.body;
-        const result = await espacioService.resolverSolicitud(
+        const result = await espacioService.resolverSolicitudOwner(
             request.params.id,
             request.params.idUsuario,
-            aprobadoPor,
+            request.user.idUsuario,
             false
         );
         return apiResponse.success(response, result, 'Solicitud rechazada con exito');
     }
 
     async expulsarUsuario(request, response) {
-        const { aprobadoPor } = request.body;
-        const result = await espacioService.expulsarUsuario(
+        const result = await espacioService.expulsarUsuarioOwner(
             request.params.id,
             request.params.idUsuario,
-            aprobadoPor
+            request.user.idUsuario
         );
         return apiResponse.success(response, result, 'Usuario expulsado con exito');
     }
 
     async listarMiembros(request, response) {
-        const rows = await espacioService.listarMiembros(request.params.id);
+        const rows = await espacioService.listarMiembrosAutorizado(
+            request.params.id,
+            request.user.idUsuario
+        );
         return apiResponse.success(response, rows, 'Miembros obtenidos');
+    }
+
+    async obtenerMiEstado(request, response) {
+        const row = await espacioService.obtenerMiEstadoEspacio(
+            request.params.id,
+            request.user.idUsuario
+        );
+        return apiResponse.success(response, row, 'Estado del usuario en espacio obtenido');
     }
 }
 

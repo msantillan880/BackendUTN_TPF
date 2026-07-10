@@ -102,13 +102,6 @@ const options = {
                             in: 'query',
                             required: false,
                             schema: { type: 'string' }
-                        },
-                        {
-                            name: 'categoria',
-                            in: 'query',
-                            required: false,
-                            schema: { type: 'string' },
-                            description: 'Compatibilidad legacy. Preferir idEspacio.'
                         }
                     ],
                     responses: {
@@ -267,7 +260,7 @@ const options = {
                                 schema: {
                                     type: 'object',
                                     properties: {
-                                        categoria: { type: 'string', example: 'ASTRONOMIA' },
+                                        idEspacio: { type: 'integer', example: 3 },
                                         nombre: { type: 'string', example: '' },
                                         comentario: { type: 'string', example: '' },
                                         direccion: { type: 'string', example: '' }
@@ -304,6 +297,25 @@ const options = {
                     responses: {
                         201: { description: 'Creado' },
                         400: { description: 'Payload invalido', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } }
+                    }
+                }
+            },
+            '/api/usuarios/{id}': {
+                delete: {
+                    tags: ['Usuarios'],
+                    summary: 'Eliminar usuario y dependencias (cleanup de pruebas, sin auth)',
+                    description: 'Endpoint simplificado para limpieza de datos de demo del TP. No requiere Bearer token.',
+                    parameters: [
+                        {
+                            name: 'id',
+                            in: 'path',
+                            required: true,
+                            schema: { type: 'integer' }
+                        }
+                    ],
+                    responses: {
+                        200: { description: 'Usuario y datos asociados eliminados' },
+                        404: { description: 'Usuario no encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } }
                     }
                 }
             },
