@@ -47,6 +47,17 @@ class EspacioController {
         return apiResponse.created(response, result, 'Espacio creado con exito');
     }
 
+    async actualizarEspacio(request, response) {
+        const { denominacion, tipoEspacio } = request.body;
+        const result = await espacioService.actualizarEspacioOwner(
+            request.params.id,
+            denominacion,
+            tipoEspacio,
+            request.user.idUsuario
+        );
+        return apiResponse.success(response, result, 'Espacio actualizado con exito');
+    }
+
     async solicitarIngreso(request, response) {
         const result = await espacioService.solicitarIngresoAutenticado(
             request.params.id,

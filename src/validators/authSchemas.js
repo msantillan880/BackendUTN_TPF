@@ -24,7 +24,8 @@ export const loginSchema = z.object({
         .email('email invalido'),
     password: z
         .string({ required_error: 'password es obligatorio' })
-        .min(1, 'password es obligatorio')
+        .min(8, 'password debe tener al menos 8 caracteres')
+        .max(120, 'password supera el maximo permitido')
 });
 
 export const forgotPasswordSchema = z.object({

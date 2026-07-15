@@ -4,8 +4,8 @@
  */
 export class Consulta {
   static INSERT_LINK = `
-    INSERT INTO links (idEspacio, nombre, comentario, direccion) 
-    VALUES (?, ?, ?, ?)
+    INSERT INTO links (idEspacio, nombre, comentario, direccion, createdBy)
+    VALUES (?, ?, ?, ?, ?)
   `;
 
   static UPDATE = `
@@ -23,12 +23,15 @@ export class Consulta {
       l.link_id,
       l.idEspacio,
       e.denominacion AS espacio,
+      l.createdBy,
+      u.nombre AS creadorNombre,
       l.nombre,
       l.comentario,
       l.direccion,
       l.created_at
     FROM links l
     INNER JOIN Espacios e ON e.idEspacio = l.idEspacio
+    LEFT JOIN Usuarios u ON u.idUsuario = l.createdBy
     ORDER BY e.denominacion DESC, l.link_id DESC
   `;
 
@@ -37,12 +40,15 @@ export class Consulta {
       l.link_id,
       l.idEspacio,
       e.denominacion AS espacio,
+      l.createdBy,
+      u.nombre AS creadorNombre,
       l.nombre,
       l.comentario,
       l.direccion,
       l.created_at
     FROM links l
     INNER JOIN Espacios e ON e.idEspacio = l.idEspacio
+    LEFT JOIN Usuarios u ON u.idUsuario = l.createdBy
     ORDER BY e.denominacion ASC, l.nombre ASC
   `;
 
@@ -51,12 +57,15 @@ export class Consulta {
       l.link_id,
       l.idEspacio,
       e.denominacion AS espacio,
+      l.createdBy,
+      u.nombre AS creadorNombre,
       l.nombre,
       l.comentario,
       l.direccion,
       l.created_at
     FROM links l
     INNER JOIN Espacios e ON e.idEspacio = l.idEspacio
+    LEFT JOIN Usuarios u ON u.idUsuario = l.createdBy
     WHERE l.link_id = ?
   `;
 
@@ -65,12 +74,15 @@ export class Consulta {
       l.link_id,
       l.idEspacio,
       e.denominacion AS espacio,
+      l.createdBy,
+      u.nombre AS creadorNombre,
       l.nombre,
       l.comentario,
       l.direccion,
       l.created_at
     FROM links l
     INNER JOIN Espacios e ON e.idEspacio = l.idEspacio
+    LEFT JOIN Usuarios u ON u.idUsuario = l.createdBy
     WHERE l.idEspacio = ?
       AND (
         l.nombre LIKE ?
@@ -132,6 +144,14 @@ export class ConsultaEspacios {
   static INSERT_ESPACIO = `
     INSERT INTO Espacios (denominacion, idOwner, tipoEspacio)
     VALUES (?, ?, ?)
+  `;
+
+  static UPDATE_ESPACIO_BY_ID_OWNER = `
+    UPDATE Espacios
+    SET denominacion = ?,
+        tipoEspacio = ?
+    WHERE idEspacio = ?
+      AND idOwner = ?
   `;
 
   static LISTAR_ESPACIOS = `
@@ -196,6 +216,19 @@ export class ConsultaEspacios {
     FROM Espacio_Usuarios
     WHERE idUsuario = ? AND idEspacio = ?
     LIMIT 1
+  `;
+
+  static LISTAR_LINKS_POR_USUARIO_EN_ESPACIO = `
+    SELECT
+      l.link_id,
+      l.nombre,
+      l.comentario,
+      l.direccion,
+      l.created_at
+    FROM links l
+    WHERE l.idEspacio = ?
+      AND l.createdBy = ?
+    ORDER BY l.link_id ASC
   `;
 
   static LISTAR_CATEGORIAS_ACCESIBLES_USUARIO = `

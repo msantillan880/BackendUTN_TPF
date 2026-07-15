@@ -1,6 +1,6 @@
 body {
   font-family: Arial, sans-serif;
-  margin: 20px;
+  margin: clamp(8px, 2vw, 20px);
   background-image: url("/images/imagenX.jpg");
   background-size: cover;
   background-attachment: fixed;
@@ -8,7 +8,7 @@ body {
 }
 
 .container {
-  max-width: 1400px;
+  width: min(100%, 1600px);
   margin: 0 auto;
   background-color: rgba(255, 255, 255, 0.95);
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -18,7 +18,7 @@ body {
   background-color: #d3d3d3;
   padding: 10px;
   text-align: center;
-  font-size: 24px;
+  font-size: clamp(20px, 2.2vw, 24px);
   margin-bottom: 20px;
 }
 
@@ -481,15 +481,17 @@ form {
 
 .button-container {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 4px;
   background-color: #0000cd;
   padding: 4px;
   margin: 12px 0;
 }
 
 .button-container button {
-  flex: 1;
-  margin: 0 2px;
+  flex: 1 1 110px;
+  margin: 0;
   padding: 4px 8px;
   background-color: #f0f0f0;
   border: 1px solid #999;
@@ -604,7 +606,14 @@ body.space-mode .table-container {
 .table-container {
   padding: 14px;
   position: relative;
-  height: 650px; /* Aumentada la altura para mostrar 10 filas */
+  min-height: 280px;
+  height: clamp(320px, 60vh, 650px);
+}
+
+.selected-space-title {
+  margin: 0 0 10px 0;
+  color: #003399;
+  font-size: clamp(14px, 1.5vw, 18px);
 }
 
 .table-wrapper {
@@ -635,7 +644,7 @@ th {
   border-bottom: 2px solid #ddd;
   padding: 9px 8px;
   text-align: center; /* Centrado el texto del encabezado */
-  min-width: 150px;
+  min-width: 120px;
   position: sticky;
   top: 0;
 }
@@ -643,7 +652,7 @@ th {
 /* Hacer la columna dirección más ancha */
 th:last-child,
 td:last-child {
-  min-width: 400px; /* Doble ancho para la columna dirección */
+  min-width: 220px;
 }
 
 td {
@@ -651,6 +660,7 @@ td {
   padding: 6px;
   text-align: left;
   height: 18px;
+  word-break: break-word;
 }
 
 tr:hover {
@@ -677,4 +687,41 @@ tr.selected {
 .table-container th:first-child,
 .table-container td:first-child {
   display: none;
+}
+
+@media (max-width: 640px) {
+  .mock-top-actions {
+    justify-content: stretch;
+    flex-direction: column;
+  }
+
+  .add-space-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .button-container button {
+    flex: 1 1 calc(50% - 4px);
+  }
+
+  .table-container {
+    padding: 8px;
+    min-height: 220px;
+    height: 50vh;
+  }
+
+  th {
+    min-width: 96px;
+    font-size: 12px;
+    padding: 7px 6px;
+  }
+
+  td {
+    font-size: 12px;
+  }
+
+  th:last-child,
+  td:last-child {
+    min-width: 170px;
+  }
 }

@@ -11,12 +11,69 @@ if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
 }
 
+function parseMysqlUri(rawUri) {
+    const uri = String(rawUri || '').trim();
+    if (!uri) return null;
+
+    try {
+        const parsed = new URL(uri);
+        return {
+            host: parsed.hostname || '',
+            user: decodeURIComponent(parsed.username || ''),
+            password: decodeURIComponent(parsed.password || ''),
+            database: String(parsed.pathname || '').replace(/^\/+/, ''),
+            port: parsed.port ? Number(parsed.port) : 3306
+        };
+    } catch (_error) {
+        return null;
+    }
+}
+
 // Configuracion desde variables de entorno (usar .env si es necesario)
-const MYSQL_HOST = process.env.MYSQL_HOST || '127.0.0.1';
-const MYSQL_USER = process.env.MYSQL_USER || 'root';
-const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || '';
-const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'bookmarks';
-const MYSQL_PORT = process.env.MYSQL_PORT ? Number(process.env.MYSQL_PORT) : 3306;
+// Prioridad: variables separadas > URI > valores por defecto.
+const MYSQL_URI =
+    process.env.MYSQL_URI ||
+    process.env.DATABASE_URL ||
+    process.env.MYSQL_URL ||
+    process.env.MYSQL_ADDON_URI ||
+    process.env.CLEVERCLOUD_MYSQL_ADDON_URI ||
+    '';
+
+const mysqlFromUri = parseMysqlUri(MYSQL_URI);
+
+const MYSQL_HOST =
+    process.env.MYSQL_HOST ||
+    process.env.MYSQL_ADDON_HOST ||
+    process.env.CLEVERCLOUD_MYSQL_ADDON_HOST ||
+    mysqlFromUri?.host ||
+    '127.0.0.1';
+const MYSQL_USER =
+    process.env.MYSQL_USER ||
+    process.env.MYSQL_ADDON_USER ||
+    process.env.CLEVERCLOUD_MYSQL_ADDON_USER ||
+    mysqlFromUri?.user ||
+    'root';
+const MYSQL_PASSWORD =
+    process.env.MYSQL_PASSWORD ||
+    process.env.MYSQL_ADDON_PASSWORD ||
+    process.env.CLEVERCLOUD_MYSQL_ADDON_PASSWORD ||
+    mysqlFromUri?.password ||
+    '';
+const MYSQL_DATABASE =
+    process.env.MYSQL_DATABASE ||
+    process.env.MYSQL_ADDON_DB ||
+    process.env.MYSQL_ADDON_DATABASE ||
+    process.env.CLEVERCLOUD_MYSQL_ADDON_DB ||
+    process.env.CLEVERCLOUD_MYSQL_ADDON_DATABASE ||
+    mysqlFromUri?.database ||
+    'bookmarks';
+const MYSQL_PORT = process.env.MYSQL_PORT
+    ? Number(process.env.MYSQL_PORT)
+    : (
+        process.env.MYSQL_ADDON_PORT
+            ? Number(process.env.MYSQL_ADDON_PORT)
+            : (mysqlFromUri?.port || 3306)
+    );
 const DEMO_MODE = ['1', 'true', 'yes'].includes(String(process.env.DEMO_MODE || '').toLowerCase());
 
 // Crear pool de conexiones
@@ -92,11 +149,16 @@ export async function initDatabase() {
                 nombre VARCHAR(255) NOT NULL,
                 comentario TEXT,
                 direccion VARCHAR(2048) NOT NULL,
+                createdBy INT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_links_idEspacio (idEspacio),
+                INDEX idx_links_createdBy (createdBy),
                 CONSTRAINT fk_links_espacio
                     FOREIGN KEY (idEspacio) REFERENCES Espacios(idEspacio)
-                    ON DELETE CASCADE
+                    ON DELETE CASCADE,
+                CONSTRAINT fk_links_created_by
+                    FOREIGN KEY (createdBy) REFERENCES Usuarios(idUsuario)
+                    ON DELETE SET NULL
             ) ENGINE=InnoDB;
         `;
 
@@ -188,6 +250,7 @@ export async function initDatabase() {
         // Migracion links.categoria -> links.idEspacio
         const linksTieneCategoria = await hasColumn('links', 'categoria');
         await ensureColumn('links', 'idEspacio', 'idEspacio INT NULL');
+        await ensureColumn('links', 'createdBy', 'createdBy INT NULL');
 
         if (linksTieneCategoria) {
             await pool.execute(`
@@ -211,6 +274,16 @@ export async function initDatabase() {
                 ADD CONSTRAINT fk_links_espacio
                 FOREIGN KEY (idEspacio) REFERENCES Espacios(idEspacio)
                 ON DELETE CASCADE
+            `);
+        }
+
+        const linksTieneFkCreatedBy = await hasForeignKey('links', 'fk_links_created_by');
+        if (!linksTieneFkCreatedBy) {
+            await pool.execute(`
+                ALTER TABLE links
+                ADD CONSTRAINT fk_links_created_by
+                FOREIGN KEY (createdBy) REFERENCES Usuarios(idUsuario)
+                ON DELETE SET NULL
             `);
         }
 

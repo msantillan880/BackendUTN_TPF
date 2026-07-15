@@ -120,6 +120,59 @@ Secuencia completa de funcionamiento de la aplicacion:
 - La UI no expone tokens ni links internos.
 - El endpoint de verificacion responde HTML amigable para navegador y JSON para API (`?format=json`).
 
+### 2.4 Que es un helper y por que se separan las capas
+
+Definicion de helper:
+
+- un helper es una funcion/utilidad reutilizable que encapsula una tarea puntual,
+- su objetivo es evitar duplicacion y mantener el codigo mas claro,
+- ejemplo en este TPF: formatear respuestas API o renderizar una pagina HTML de verificacion.
+
+Por que se usa cada carpeta/capa:
+
+- controllers:
+  - reciben `req`/`res`, extraen datos de entrada y devuelven respuesta HTTP,
+  - no deben concentrar reglas complejas de negocio.
+
+- middleware:
+  - ejecuta logica transversal antes del controller (JWT, validacion, seguridad),
+  - evita repetir controles en cada endpoint.
+
+- models:
+  - representan la estructura de datos del dominio (entidades y campos),
+  - ayudan a mantener consistencia semantica entre capas.
+
+- repositories:
+  - centralizan acceso a BD y SQL,
+  - desacoplan reglas de negocio del detalle de persistencia.
+
+- routes:
+  - definen URLs, metodos HTTP y cadena de middlewares,
+  - mantienen el mapa de API ordenado y legible.
+
+- services:
+  - contienen reglas de negocio y autorizacion,
+  - son el lugar correcto para decisiones como permisos y validaciones de contexto.
+
+- utils:
+  - funciones genericas de soporte (tiempo, token, logger, observador, mensajes),
+  - reutilizan logica tecnica comun sin acoplarla al negocio.
+
+- validators:
+  - esquemas de validacion de entrada (por ejemplo con Zod),
+  - aseguran que la API procese datos con formato esperado.
+
+- helpers:
+  - utilidades enfocadas en casos de aplicacion (respuesta API, manejo async, render HTML puntual),
+  - mejoran legibilidad y separan tareas repetitivas del controller.
+
+Regla practica para decidir ubicacion:
+
+- si depende de HTTP, va cerca de controller/middleware,
+- si es regla de negocio, va en service,
+- si toca SQL, va en repository,
+- si es reutilizable y transversal, va en helper o utils segun el nivel de dominio.
+
 ## 3) Autenticacion y sesiones con JWT
 
 Modelo de sesion implementado: stateless con access token.
@@ -155,9 +208,70 @@ Firma:
 
 Vigencia del access token en este proyecto:
 
-- valor por defecto: 15 minutos,
-- configuracion: variable de entorno JWT_ACCESS_EXPIRES,
-- ejemplo actual recomendado: JWT_ACCESS_EXPIRES=15m.
+- valor configurable por entorno: variable JWT_ACCESS_EXPIRES,
+- configuracion actual sugerida para demo web multiusuario: JWT_ACCESS_EXPIRES=8h,
+- recomendacion de produccion: reducir vigencia y complementar con refresh token.
+
+### 3.4 Justificacion de uso de Socket.IO para logging (seccion para defensa/PDF)
+
+En este TPF, Socket.IO se usa como canal de telemetria de sesion del cliente (conexion/desconexion y metadatos de navegador), complementando el logging HTTP tradicional.
+
+Justificacion tecnica:
+
+- permite capturar eventos de tiempo real que no pasan por un endpoint REST (por ejemplo, alta de conexion de una pestana),
+- simplifica la correlacion entre navegadores concurrentes mediante `socket.id`,
+- aporta visibilidad para demo multiusuario (owner y visitante en paralelo) sin recargar la API de negocio,
+- convive con el log de auditoria HTTP (ABM y consultas), por lo que ambos enfoques se complementan:
+  - Socket.IO: eventos de sesion/canal en tiempo real,
+  - HTTP audit: quien hizo cada operacion (metodo, ruta, query, status y tiempo).
+
+Decision de alcance:
+
+- no reemplaza la auditoria de negocio; la complementa,
+- para trazabilidad funcional se prioriza log HTTP con usuario autenticado,
+- para observabilidad de canal se mantiene Socket.IO.
+
+### 3.6 Criterio aplicado en revision de AuthController (alcance acordado)
+
+En esta revision se aplicaron solo dos cambios de buenas practicas (sin cambios de arquitectura mayor):
+
+- 1. Endurecimiento de validacion de login:
+  - `password` en login se valida con minimo de 8 caracteres y maximo de 120,
+  - se unifica mensaje de credenciales invalidas para reducir filtrado de informacion sensible.
+
+- 2. Separacion de responsabilidades en controller:
+  - el HTML de verificacion de email se extrajo a un helper/template dedicado,
+  - el controller conserva solo la orquestacion HTTP y delega render/criterio de respuesta.
+
+Criterio explicitamente no incluido en este paso:
+
+- no se agrego rate limiting en endpoints de auth (queda como mejora posterior),
+- no se modificaron contratos de API (endpoints y estructura general de respuestas se mantienen).
+
+### 3.5 Log funcional de negocio (ABM + consulta)
+
+Para mejorar legibilidad y trazabilidad en demo, el visor de logs prioriza eventos funcionales de negocio y reduce ruido tecnico.
+
+Eventos registrados (con usuario):
+
+- `[CREAR]`: alta de link,
+- `[MODIFICAR]`: edicion de link,
+- `[BORRAR]`: baja de link,
+- `[BUSCAR]`: consulta por criterios,
+- `[CONSULTA]`: consultas de lectura (listar/obtener).
+
+Formato objetivo de cada linea:
+
+- tipo de accion,
+- usuario autenticado que ejecuta la accion,
+- identificadores relevantes (idEspacio, idLink),
+- datos de contexto (criterios o resumen del cambio).
+
+Beneficio para defensa del TP:
+
+- permite responder claramente "quien hizo que" en ABM y consultas,
+- evita sobrecarga visual por eventos tecnicos no funcionales,
+- facilita auditar pruebas multiusuario (owner/visitante) durante la demostracion.
 
 ## 4) Seguridad implementada
 
@@ -255,6 +369,28 @@ Como decision de alcance del proyecto, no se implemento una funcionalidad indepe
 - Read (listar/obtener/buscar): owner o visitante aprobado.
 - Create: owner o visitante aprobado.
 - Update/Delete: solo owner.
+
+### 6.5 Politica de links ante expulsion (criterio adoptado)
+
+Criterio funcional elegido para el TP:
+
+- al expulsar un usuario de un espacio, ese usuario pierde acceso al espacio,
+- los links que ese usuario haya creado no se eliminan automaticamente,
+- se conserva la informacion para trazabilidad y para decision posterior del owner,
+- el owner puede decidir mas adelante si mantiene, edita o elimina esos links.
+
+Justificacion del criterio:
+
+- evita perdida de informacion util del espacio,
+- preserva historial funcional para auditoria y defensa del TP,
+- mantiene la gobernanza del contenido en el owner sin acciones destructivas automáticas.
+
+Observacion de interfaz:
+
+- en la implementacion actual, el autor expulsado no se muestra "tachado" en UI,
+- la marca visual (por ejemplo autor tachado o etiqueta "expulsado") queda como mejora incremental opcional.
+- en la tabla principal de links, la primera columna visible es `Agregado por`, mostrando el nombre del usuario autor del link,
+- esto refuerza trazabilidad funcional sin borrar contenido cuando un usuario es expulsado.
 
 Implementacion actual:
 

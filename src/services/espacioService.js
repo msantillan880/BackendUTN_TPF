@@ -4,6 +4,7 @@ import { EspacioUsuario } from '../models/EspacioUsuario.js';
 import { validarXSS } from '../middleware/xssValidation.js';
 import espacioRepository from '../repositories/espacioRepository.js';
 import ServerError from '../Helpers/serverError.helper.js';
+import observer from '../utils/observer.js';
 
 function toNullableInteger(value) {
     if (value === undefined || value === null || value === '') return null;
@@ -166,6 +167,17 @@ class EspacioService {
             throw new ServerError('Solicitud no encontrada para ese usuario y espacio', 404);
         }
 
+        try {
+            const owner = await this.repository.obtenerUsuarioPorId(aprobador);
+            const objetivo = await this.repository.obtenerUsuarioPorId(usuarioId);
+            const accion = aprobar ? '[APROBAR]' : '[RECHAZAR]';
+            observer.notificar(
+                `${accion} owner:${String(owner?.nombre || 'desconocido')} usuario:${String(objetivo?.nombre || 'desconocido')} espacio:${String(espacio.denominacion || '-')}`
+            );
+        } catch (_err) {
+            // No interrumpir flujo por logging.
+        }
+
         return { success: true, estado };
     }
 
@@ -188,6 +200,34 @@ class EspacioService {
 
         if (!result.affectedRows) {
             throw new ServerError('Relacion usuario-espacio no encontrada', 404);
+        }
+
+        try {
+            const espacio = await this.repository.obtenerEspacioPorId(espacioId);
+            const owner = await this.repository.obtenerUsuarioPorId(aprobador);
+            const objetivo = await this.repository.obtenerUsuarioPorId(usuarioId);
+            observer.notificar(
+                `[EXPULSAR] owner:${String(owner?.nombre || 'desconocido')} usuario:${String(objetivo?.nombre || 'desconocido')} espacio:${String(espacio?.denominacion || '-')}`
+            );
+
+            const linksCreados = await this.repository.listarLinksPorUsuarioEnEspacio(usuarioId, espacioId);
+            if (!linksCreados || !linksCreados.length) {
+                observer.notificar(
+                    `[EXPULSAR-LINKS] owner:${String(owner?.nombre || 'desconocido')} usuario:${String(objetivo?.nombre || 'desconocido')} espacio:${String(espacio?.denominacion || '-')} links:0`
+                );
+            } else {
+                observer.notificar(
+                    `[EXPULSAR-LINKS] owner:${String(owner?.nombre || 'desconocido')} usuario:${String(objetivo?.nombre || 'desconocido')} espacio:${String(espacio?.denominacion || '-')} links:${linksCreados.length}`
+                );
+
+                linksCreados.forEach((link) => {
+                    observer.notificar(
+                        `[EXPULSAR-LINKS] usuario:${String(objetivo?.nombre || 'desconocido')} espacio:${String(espacio?.denominacion || '-')} link:${String(link.nombre || '')} comentario:${String(link.comentario || '')} direccion:${String(link.direccion || '')}`
+                    );
+                });
+            }
+        } catch (_err) {
+            // No interrumpir flujo por logging.
         }
 
         return { success: true, estado: 4 };
@@ -247,6 +287,44 @@ class EspacioService {
     async crearEspacioParaOwner(denominacion, idOwnerActor, tipoEspacio = 'publico') {
         const owner = toRequiredInteger(idOwnerActor, 'idOwner');
         return this.crearEspacio(denominacion, owner, tipoEspacio);
+    }
+
+    async actualizarEspacioOwner(idEspacio, denominacion, tipoEspacio, idOwnerActor) {
+        const espacioId = toRequiredInteger(idEspacio, 'idEspacio');
+        const ownerId = toRequiredInteger(idOwnerActor, 'idOwner');
+
+        const espacioActual = await this.repository.obtenerEspacioPorId(espacioId);
+        if (!espacioActual) {
+            throw new ServerError('Espacio no encontrado', 404);
+        }
+
+        if (Number(espacioActual.idOwner) !== ownerId) {
+            throw new ServerError('Solo el owner puede editar el espacio', 403);
+        }
+
+        if (!denominacion || String(denominacion).trim() === '') {
+            throw new ServerError('La denominacion del espacio es obligatoria', 400);
+        }
+
+        const tipo = normalizarTipoEspacio(tipoEspacio);
+        if (!tipo) {
+            throw new ServerError('tipoEspacio debe ser publico/privado (o 0/1)', 400);
+        }
+
+        const { texto: denominacionLimpia } = validarXSS(String(denominacion).trim());
+        const espacio = new Espacio(denominacionLimpia, ownerId, tipo);
+
+        const result = await this.repository.actualizarEspacioOwner(espacioId, ownerId, espacio);
+        if (!Number(result?.affectedRows || 0)) {
+            throw new ServerError('No se pudo actualizar el espacio', 500);
+        }
+
+        return {
+            success: true,
+            idEspacio: espacioId,
+            denominacion: denominacionLimpia,
+            tipoEspacio: tipo
+        };
     }
 
     async solicitarIngresoAutenticado(idEspacio, idUsuarioActor) {

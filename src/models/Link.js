@@ -3,11 +3,12 @@
  * 
  */
 export class Link {
-  constructor(idEspacio, nombre, comentario, direccion) {
+  constructor(idEspacio, nombre, comentario, direccion, createdBy = null) {
     this.idEspacio = idEspacio;
     this.nombre = nombre;
     this.comentario = comentario;
     this.direccion = direccion;
+    this.createdBy = createdBy;
   }
 
   getInfo() {
@@ -15,11 +16,12 @@ export class Link {
       idEspacio: this.idEspacio,
       nombre: this.nombre,
       comentario: this.comentario,
-      direccion: this.direccion
+      direccion: this.direccion,
+      createdBy: this.createdBy
     };
   }
 
   toArray() {
-    return [this.idEspacio, this.nombre, this.comentario, this.direccion];
+    return [this.idEspacio, this.nombre, this.comentario, this.direccion, this.createdBy];
   }
 }

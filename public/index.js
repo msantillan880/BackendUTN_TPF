@@ -43,9 +43,13 @@ const mockState = {
 };
 
 const ACCESS_TOKEN_KEY = 'accessToken';
+const AUTO_REFRESH_INTERVAL_MS = 8000;
 const authSession = {
     user: null
 };
+let autoRefreshTimer = null;
+let autoRefreshInFlight = false;
+let autoRefreshHooksConfigured = false;
 
 function getToken() {
     return localStorage.getItem(ACCESS_TOKEN_KEY) || '';
@@ -142,6 +146,10 @@ function setAuthenticatedUIState(isAuthenticated) {
     if (spaceForm && !isAuthenticated) spaceForm.classList.add('hidden');
 
     if (!isAuthenticated) {
+        stopAutoRefresh();
+    }
+
+    if (!isAuthenticated) {
         const select = document.getElementById('categoria');
         if (select) select.innerHTML = '';
         const tbody = getMainLinksTbody();
@@ -230,6 +238,55 @@ function clearLinkFields() {
     document.querySelectorAll('table tbody tr').forEach(r => r.classList.remove('selected'));
 }
 
+function snapshotLinkFormState() {
+    const nombre = document.getElementById('nombre');
+    const comentario = document.getElementById('comentario');
+    const direccion = document.getElementById('direccion');
+    const active = document.activeElement;
+    const focusedId = active && active.id ? String(active.id) : '';
+
+    return {
+        nombre: nombre ? nombre.value : '',
+        comentario: comentario ? comentario.value : '',
+        direccion: direccion ? direccion.value : '',
+        selectedId: selectedId,
+        hasFocus: ['nombre', 'comentario', 'direccion'].includes(focusedId)
+    };
+}
+
+function restoreLinkFormState(state) {
+    if (!state) return;
+
+    const nombre = document.getElementById('nombre');
+    const comentario = document.getElementById('comentario');
+    const direccion = document.getElementById('direccion');
+
+    if (nombre) nombre.value = state.nombre || '';
+    if (comentario) comentario.value = state.comentario || '';
+    if (direccion) direccion.value = state.direccion || '';
+
+    selectedId = state.selectedId || null;
+
+    if (!selectedId) {
+        document.querySelectorAll('.table-container tbody tr').forEach((row) => row.classList.remove('selected'));
+        return;
+    }
+
+    let foundRow = false;
+    document.querySelectorAll('.table-container tbody tr').forEach((row) => {
+        const celdas = row.getElementsByTagName('td');
+        const isMatch = celdas && celdas[0] && String(celdas[0].innerText) === String(selectedId);
+        row.classList.toggle('selected', isMatch);
+        if (isMatch) {
+            foundRow = true;
+        }
+    });
+
+    if (!foundRow) {
+        selectedId = null;
+    }
+}
+
 function getSelectedSpace() {
     return mockState.spaces.find(s => s.id === mockState.selectedSpaceId) || null;
 }
@@ -244,18 +301,17 @@ function updateActionButtonsVisibility() {
         html: 'btnHtml',
         manual: 'btnManual',
         espacio: 'btnEspacio',
-        log: 'btnLog',
-        salir: 'btnSalir'
+        log: 'btnLog'
     };
 
     const selectedSpace = getSelectedSpace();
     const state = selectedSpace ? getAccessState(selectedSpace) : 'solicitar';
 
-    let visibles = ['agregar', 'buscar', 'limpiar', 'html', 'manual', 'salir'];
+    let visibles = ['agregar', 'buscar', 'limpiar', 'html', 'manual'];
 
     // Owner puede ver opciones de gestión adicionales.
     if (state === 'owner') {
-        visibles = ['agregar', 'modificar', 'borrar', 'buscar', 'limpiar', 'html', 'manual', 'espacio', 'log', 'salir'];
+        visibles = ['agregar', 'modificar', 'borrar', 'buscar', 'limpiar', 'html', 'manual', 'espacio', 'log'];
     }
 
     Object.entries(buttonIds).forEach(([key, id]) => {
@@ -412,6 +468,7 @@ async function refreshLinksFromApi() {
         grouped[space.id].push({
             link_id: Number(link.link_id),
             nombre: link.nombre,
+            creadorNombre: link.creadorNombre || '-',
             comentario: link.comentario,
             direccion: link.direccion
         });
@@ -429,12 +486,144 @@ async function hydrateStateFromApi() {
     mockState.selectedSpaceId = currentUserMembership ? currentUserMembership.spaceId : (mockState.spaces[0] ? mockState.spaces[0].id : null);
 }
 
+function hasAuthenticatedSession() {
+    return Boolean(getToken() && authSession.user && Number(authSession.user.idUsuario));
+}
+
+function isUserEditingCriticalForms() {
+    const active = document.activeElement;
+    if (!active || !active.id) return false;
+
+    const editingFieldIds = new Set([
+        'nombre',
+        'comentario',
+        'direccion',
+        'ownerPanelSpaceName',
+        'ownerPanelSpaceType',
+        'spaceName',
+        'spaceType'
+    ]);
+
+    return editingFieldIds.has(String(active.id));
+}
+
+async function syncStateAndRender(options = {}) {
+    const { showAlertOnError = false } = options;
+    if (!hasAuthenticatedSession()) return;
+
+    const previousSelectedSpaceId = mockState.selectedSpaceId;
+
+    try {
+        await refreshUsersFromApi();
+        await refreshSpacesAndMembershipsFromApi();
+        await refreshLinksFromApi();
+
+        if (previousSelectedSpaceId) {
+            const stillVisible = mockState.spaces.some((space) => (
+                Number(space.id) === Number(previousSelectedSpaceId)
+                && canListSpace(space)
+            ));
+            if (stillVisible) {
+                mockState.selectedSpaceId = Number(previousSelectedSpaceId);
+            }
+        }
+
+        renderLoggedUser();
+        renderSpaceOptions();
+        renderSelectedSpaceStatus();
+        renderSelectedSpaceLinksInMainTable({ keepFormState: true });
+        updateActionButtonsVisibility();
+
+        const ownerPanel = document.getElementById('ownerSpacePanel');
+        if (ownerPanel && !ownerPanel.classList.contains('hidden')) {
+            const selectedSpace = getSelectedSpace();
+            if (selectedSpace && selectedSpace.ownerId === mockState.currentUserId) {
+                renderOwnerSpacePanel();
+            } else {
+                hideOwnerSpacePanel();
+            }
+        }
+    } catch (err) {
+        console.error('Auto-refresh state sync failed:', err);
+        if (showAlertOnError) {
+            alert(`No se pudo actualizar datos en vivo: ${err.message}`);
+        }
+    }
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+    }
+    autoRefreshInFlight = false;
+}
+
+function triggerAutoRefresh() {
+    if (autoRefreshInFlight || !hasAuthenticatedSession()) {
+        return;
+    }
+
+    if (isUserEditingCriticalForms()) {
+        return;
+    }
+
+    autoRefreshInFlight = true;
+    syncStateAndRender({ showAlertOnError: false })
+        .finally(() => {
+            autoRefreshInFlight = false;
+        });
+}
+
+function startAutoRefresh() {
+    if (autoRefreshTimer) return;
+
+    autoRefreshTimer = setInterval(() => {
+        if (document.hidden) return;
+        triggerAutoRefresh();
+    }, AUTO_REFRESH_INTERVAL_MS);
+}
+
+function setupAutoRefreshHooks() {
+    if (autoRefreshHooksConfigured) return;
+    autoRefreshHooksConfigured = true;
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            triggerAutoRefresh();
+        }
+    });
+
+    window.addEventListener('focus', () => {
+        triggerAutoRefresh();
+    });
+
+    const refreshOnBlurIds = [
+        'nombre',
+        'comentario',
+        'direccion',
+        'ownerPanelSpaceName',
+        'ownerPanelSpaceType',
+        'spaceName',
+        'spaceType'
+    ];
+
+    refreshOnBlurIds.forEach((id) => {
+        const element = document.getElementById(id);
+        if (!element) return;
+
+        element.addEventListener('blur', () => {
+            triggerAutoRefresh();
+        });
+    });
+}
+
 function setupOwnerPanelActions() {
     const btnSave = document.getElementById('ownerPanelSaveBtn');
     const btnCancel = document.getElementById('ownerPanelCancelBtn');
 
     if (btnSave) {
-        btnSave.addEventListener('click', () => {
+        btnSave.addEventListener('click', async () => {
             const space = getSelectedSpace();
             if (!space) return;
 
@@ -446,7 +635,19 @@ function setupOwnerPanelActions() {
                 return;
             }
 
-            alert('La edicion de datos del espacio se implementara en el siguiente paso.\nPor ahora se mantienen persistentes altas/bajas de links y solicitudes.');
+            try {
+                await updateSpaceInDatabase(space.id, newName, newType);
+                await refreshSpacesAndMembershipsFromApi();
+                await refreshLinksFromApi();
+                renderSpaceOptions();
+                renderSelectedSpaceStatus();
+                renderSelectedSpaceLinksInMainTable();
+                renderOwnerSpacePanel();
+                updateActionButtonsVisibility();
+                alert('Espacio actualizado con exito.');
+            } catch (err) {
+                alert(`No se pudo actualizar el espacio: ${err.message}`);
+            }
         });
     }
 
@@ -717,12 +918,18 @@ function solicitarAutorizacion(spaceId) {
         });
 }
 
-function renderSelectedSpaceLinksInMainTable() {
+function renderSelectedSpaceLinksInMainTable(options = {}) {
+    const { keepFormState = false } = options;
     const tbody = getMainLinksTbody();
     if (!tbody) return;
 
+    const formState = keepFormState ? snapshotLinkFormState() : null;
+
     tbody.innerHTML = '';
-    clearLinkFields();
+    if (!keepFormState) {
+        clearLinkFields();
+    }
+    renderSelectedSpaceTableTitle();
 
     const space = getSelectedSpace();
     if (!space) {
@@ -738,7 +945,7 @@ function renderSelectedSpaceLinksInMainTable() {
     links.forEach((item, idx) => {
         const row = document.createElement('tr');
         row.insertCell(0).textContent = item.link_id || (idx + 1);
-        row.insertCell(1).textContent = space.nombre.toUpperCase();
+        row.insertCell(1).textContent = item.creadorNombre || '-';
         row.insertCell(2).textContent = item.nombre;
         row.insertCell(3).textContent = item.comentario;
 
@@ -755,10 +962,8 @@ function renderSelectedSpaceLinksInMainTable() {
 
     agregarEventosTabla();
 
-    // Para owner, dejar cargado por defecto el primer registro si existe.
-    const firstRow = tbody.querySelector('tr');
-    if (firstRow) {
-        llenarFormulario(firstRow);
+    if (keepFormState) {
+        restoreLinkFormState(formState);
     }
 }
 
@@ -769,6 +974,19 @@ function fillOwnerDefaults() {
     if (!current || !email || !name) return;
     email.value = current.email;
     name.value = current.nombre;
+}
+
+function renderSelectedSpaceTableTitle() {
+    const titleNode = document.getElementById('selectedSpaceTableTitle');
+    if (!titleNode) return;
+
+    const space = getSelectedSpace();
+    if (!space) {
+        titleNode.textContent = 'Espacio seleccionado: -';
+        return;
+    }
+
+    titleNode.textContent = `Espacio seleccionado: ${space.nombre}`;
 }
 
 async function requestJson(url, options = {}) {
@@ -787,7 +1005,9 @@ async function requestJson(url, options = {}) {
 
     if (!response.ok) {
         const message = (data && (data.message || data.error)) || `Error ${response.status}`;
-        throw new Error(message);
+        const error = new Error(message);
+        error.status = response.status;
+        throw error;
     }
 
     if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'ok') && Object.prototype.hasOwnProperty.call(data, 'data')) {
@@ -962,6 +1182,7 @@ function setupAuthPanel() {
 
     if (logoutButton) {
         logoutButton.addEventListener('click', () => {
+            stopAutoRefresh();
             clearToken();
             resetAppStateAfterLogout();
             renderLoggedUser();
@@ -1030,6 +1251,28 @@ async function createSpaceInDatabase(denominacion, tipoEspacio) {
     });
 
     return created && created.idEspacio ? Number(created.idEspacio) : null;
+}
+
+async function updateSpaceInDatabase(idEspacio, denominacion, tipoEspacio) {
+    if (USE_MULTIUSER_MOCK) {
+        const target = mockState.spaces.find((space) => Number(space.id) === Number(idEspacio));
+        if (!target) {
+            throw new Error('Espacio no encontrado');
+        }
+
+        target.nombre = denominacion;
+        target.tipo = String(tipoEspacio || 'publico').toLowerCase();
+        return {
+            success: true,
+            idEspacio: Number(idEspacio)
+        };
+    }
+
+    return requestJson(`/api/espacios/${idEspacio}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ denominacion, tipoEspacio })
+    });
 }
 
 function setupSpaceForm() {
@@ -1118,11 +1361,10 @@ function updateTable() {
 
             data.forEach((link) => {
                 const row = tableBody.insertRow();
-                const espacioNombre = link.espacio || link.categoria || '-';
 
                 // Insertar id en la primera celda (se ocultará vía CSS)
                 row.insertCell(0).textContent = link.link_id;
-                row.insertCell(1).textContent = espacioNombre;
+                row.insertCell(1).textContent = link.creadorNombre || '-';
                 row.insertCell(2).textContent = link.nombre;
                 row.insertCell(3).textContent = link.comentario;
                 // Crear link clicable en la columna Direccion
@@ -1161,12 +1403,22 @@ function inicializarEventos() {
             setAuthenticatedUIState(true);
             setAuthStatus('Sesion restaurada desde token guardado.');
         })
-        .catch(() => {
-            clearToken();
-            resetAppStateAfterLogout();
+        .catch((error) => {
+            const status = Number(error && error.status);
+
+            if (status === 401 || status === 403) {
+                clearToken();
+                resetAppStateAfterLogout();
+                renderLoggedUser();
+                setAuthenticatedUIState(false);
+                setAuthStatus('Sesion expirada o invalida. Ingrese nuevamente.', true);
+                return;
+            }
+
+            // Falla transitoria (backend reiniciando/red): mantener token para no forzar relogin.
             renderLoggedUser();
             setAuthenticatedUIState(false);
-            setAuthStatus('Sesion expirada o invalida. Ingrese nuevamente.', true);
+            setAuthStatus('No se pudo validar la sesion en este momento. Reintente en unos segundos.', true);
         });
 }
 
@@ -1210,7 +1462,14 @@ function crear() {
             mockState.linksBySpace[space.id] = [];
         }
 
-        mockState.linksBySpace[space.id].push({ nombre, comentario, direccion });
+        const currentUser = getCurrentUser();
+
+        mockState.linksBySpace[space.id].push({
+            nombre,
+            creadorNombre: currentUser ? currentUser.nombre : '-',
+            comentario,
+            direccion
+        });
         renderSelectedSpaceLinksInMainTable();
         return;
     }
@@ -1277,6 +1536,7 @@ function modificar() {
 
         list[idx] = {
             nombre: document.getElementById("nombre").value,
+            creadorNombre: list[idx].creadorNombre || '-',
             comentario: document.getElementById("comentario").value,
             direccion: document.getElementById("direccion").value
         };
@@ -1416,7 +1676,7 @@ function buscar() {
         list.forEach((item, idx) => {
             const row = tableBody.insertRow();
             row.insertCell(0).textContent = idx + 1;
-            row.insertCell(1).textContent = space.nombre.toUpperCase();
+            row.insertCell(1).textContent = item.creadorNombre || '-';
             row.insertCell(2).textContent = item.nombre;
             row.insertCell(3).textContent = item.comentario;
             const linkCell = row.insertCell(4);
@@ -1460,10 +1720,9 @@ function buscar() {
             tableBody.innerHTML = "";
             data.forEach((link) => {
                 const row = tableBody.insertRow();
-                const espacioNombre = link.espacio || link.categoria || '-';
 
                 row.insertCell(0).textContent = link.link_id;
-                row.insertCell(1).textContent = espacioNombre;
+                row.insertCell(1).textContent = link.creadorNombre || '-';
                 row.insertCell(2).textContent = link.nombre;
                 row.insertCell(3).textContent = link.comentario;
                 const cell4 = row.insertCell(4);
@@ -1667,16 +1926,18 @@ function docs() {
 }
 
 function log() {
-    window.open('/api/log-view', '_blank');
-}
+    const token = getToken();
+    if (!token) {
+        alert('Debe iniciar sesion para ver el log.');
+        return;
+    }
 
-function salir() {
-    clearToken();
-    resetAppStateAfterLogout();
-    renderLoggedUser();
-    setAuthenticatedUIState(false);
-    clearAuthForms();
-    setAuthStatus('Sesion cerrada. Token eliminado.');
+    const url = `/api/log-view?token=${encodeURIComponent(token)}`;
+    const newWindow = window.open(url, '_blank');
+
+    if (!newWindow) {
+        alert('El navegador bloqueo la apertura de la pestaña. Permita pop-ups para este sitio.');
+    }
 }
 
 // Función que se ejecuta cuando se hace click en una fila de la tabla
@@ -1685,7 +1946,6 @@ function llenarFormulario(fila) {
     let celdas = fila.getElementsByTagName("td");
 
     // Rellenar los campos del formulario con los valores de la fila
-    document.getElementById("categoria").value = celdas[1].innerText;
     document.getElementById("nombre").value = celdas[2].innerText;
     document.getElementById("comentario").value = celdas[3].innerText;
     document.getElementById("direccion").value = celdas[4].innerText;

@@ -1,11 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { argentinaTimestamp } from '../utils/time.js';
-import logger from '../utils/logger.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const logPath = path.join(__dirname, '../logs/registro_logs.log');
 
 /**
  * Configura los handlers de Socket.IO
@@ -24,8 +17,8 @@ export function configurarSockets(io) {
       const timestamp = argentinaTimestamp();
       const logMessage = `${timestamp} - SID: ${sessionId}, Navegador: ${userAgent}\n`;
 
-      // Usar logger centralizado
-      logger.info(logMessage.trim());
+      // Se conserva en consola para debug de sesion, sin contaminar log funcional.
+      console.log(`📝 Sesion registrada: ${logMessage.trim()}`);
 
       socket.emit('respuesta_registro', {
         uuid: sessionId,

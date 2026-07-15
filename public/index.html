@@ -154,7 +154,7 @@
             <div class="space-action-grid">
               <select id="categoria" name="categoria"></select>
               <div class="space-action-side">
-                <span class="space-action-label">Accion:</span>
+                <span class="space-action-label">Acción Pendiente:</span>
                 <div class="status-inline" id="spaceSelectionAction">-</div>
               </div>
             </div>
@@ -184,7 +184,6 @@
         <button id="btnManual" onclick="info()">Manual</button>
         <button id="btnEspacio" onclick="docs()">Edit Espacio</button>
         <button id="btnLog" onclick="log()">Log</button>
-        <button id="btnSalir" onclick="salir()">Salir</button>
       </div>
 
       <section class="owner-space-panel hidden" id="ownerSpacePanel">
@@ -232,12 +231,15 @@
       </section>
 
       <div class="table-container">
+        <h4 id="selectedSpaceTableTitle" class="selected-space-title">
+          Espacio seleccionado: -
+        </h4>
         <div class="table-wrapper">
           <table>
             <thead>
               <tr>
                 <th>Id</th>
-                <th>Espacio</th>
+                <th>Agregado por</th>
                 <th>Nombre</th>
                 <th>Comentario</th>
                 <th>Dirección</th>

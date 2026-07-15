@@ -42,6 +42,15 @@ class EspacioRepository {
         return queryRun(ConsultaEspacios.INSERT_ESPACIO, espacio.toArray());
     }
 
+    async actualizarEspacioOwner(idEspacio, idOwner, espacio) {
+        return queryRun(ConsultaEspacios.UPDATE_ESPACIO_BY_ID_OWNER, [
+            espacio.denominacion,
+            espacio.tipoEspacio,
+            Number(idEspacio),
+            Number(idOwner)
+        ]);
+    }
+
     async upsertSolicitud(relacion) {
         return queryRun(ConsultaEspacios.UPSERT_SOLICITUD, relacion.toArray());
     }
@@ -71,6 +80,13 @@ class EspacioRepository {
         return queryOne(ConsultaEspacios.OBTENER_RELACION_USUARIO_ESPACIO, [
             Number(idUsuario),
             Number(idEspacio)
+        ]);
+    }
+
+    async listarLinksPorUsuarioEnEspacio(idUsuario, idEspacio) {
+        return queryAll(ConsultaEspacios.LISTAR_LINKS_POR_USUARIO_EN_ESPACIO, [
+            Number(idEspacio),
+            Number(idUsuario)
         ]);
     }
 

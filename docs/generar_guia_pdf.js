@@ -553,6 +553,21 @@ codeBlock([
     'SMTP_FROM="BookmarksUTN <prueba.usuario2.bookmarksutn@gmail.com>"'
 ]);
 
+subsectionTitle('Nota de despliegue de base de datos (produccion)');
+bullet('Proveedor seleccionado: Clever Cloud.');
+bullet('Tipo de recurso: Add-on MySQL.');
+bullet('Plan elegido para esta entrega: DEV (estimado 0.00 EUR / 30 dias).');
+bullet('Nombre del add-on: bookmarksUtn.');
+bullet('Region: Paris (par).');
+bullet('Host: bm8teafjnsugrmlpqa9t-mysql.services.clever-cloud.com.');
+bullet('Database: bm8teafjnsugrmlpqa9t.');
+bullet('User: utu1eg8mc7xql6ac.');
+bullet('Port: 3306.');
+bullet('Password: L68spc6qZZsFVVGVF2wM.');
+bullet('Connection URI: mysql://utu1eg8mc7xql6ac:L68spc6qZZsFVVGVF2wM@bm8teafjnsugrmlpqa9t-mysql.services.clever-cloud.com:3306/bm8teafjnsugrmlpqa9t.');
+bullet('MySQL CLI: mysql -h bm8teafjnsugrmlpqa9t-mysql.services.clever-cloud.com -P 3306 -u utu1eg8mc7xql6ac -p bm8teafjnsugrmlpqa9t.');
+paragraph('La aplicacion queda preparada para conectar con variables separadas de entorno o con URI, segun configuracion del proveedor.');
+
 sectionTitle('12) Preguntas de oral con respuestas modelo');
 subsectionTitle('Pregunta: por que JWT y no sesion en servidor?');
 paragraph('Respuesta modelo: JWT permite backend stateless, simple de escalar y alineado con API REST. El token viaja en Authorization Bearer y el middleware valida firma y expiracion.');

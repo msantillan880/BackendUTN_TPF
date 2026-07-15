@@ -20,6 +20,7 @@ router.get('/espacios', asyncHandler(espacioController.listarEspacios.bind(espac
 router.get('/espacios/:id', asyncHandler(espacioController.obtenerEspacioPorId.bind(espacioController)));
 router.get('/espacios/:id/mi-estado', asyncHandler(espacioController.obtenerMiEstado.bind(espacioController)));
 router.post('/espacios', asyncHandler(espacioController.crearEspacio.bind(espacioController)));
+router.put('/espacios/:id', asyncHandler(espacioController.actualizarEspacio.bind(espacioController)));
 router.get('/espacios/:id/miembros', asyncHandler(espacioController.listarMiembros.bind(espacioController)));
 router.post('/espacios/:id/solicitudes', asyncHandler(espacioController.solicitarIngreso.bind(espacioController)));
 router.put('/espacios/:id/solicitudes/:idUsuario/aprobar', asyncHandler(espacioController.aprobarSolicitud.bind(espacioController)));

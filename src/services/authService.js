@@ -90,7 +90,7 @@ class AuthService {
         const user = await this.repository.findUserForLogin(normalizedEmail);
 
         if (!user) {
-            throw new ServerError('Usuario no registrado. Si es nuevo, registrate aqui', 401);
+            throw new ServerError('Credenciales invalidas', 401);
         }
 
         if (!user.passwordHash) {

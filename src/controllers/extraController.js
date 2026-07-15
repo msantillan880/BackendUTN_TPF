@@ -10,6 +10,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 class ExtraController {
 
+    filtrarLineasDeNegocio(lineas = []) {
+        const tagsPermitidos = ['[CREAR]', '[MODIFICAR]', '[BORRAR]', '[BUSCAR]', '[APROBAR]', '[RECHAZAR]', '[EXPULSAR]', '[EXPULSAR-LINKS]'];
+        return (lineas || []).filter((linea) => tagsPermitidos.some((tag) => String(linea || '').includes(tag)));
+    }
+
 
     // =========================
     // LEER PDF
@@ -142,6 +147,10 @@ class ExtraController {
     }
 
     async logViewHandler(request, response) {
+        response.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        response.setHeader('Pragma', 'no-cache');
+        response.setHeader('Expires', '0');
+
         const filePath = path.join(__dirname, '../logs/registro_logs.log');
 
         if (!fs.existsSync(filePath)) {
@@ -179,6 +188,8 @@ class ExtraController {
 
         const contenido = fs.readFileSync(filePath, 'utf8');
         const lineas = contenido.split('\n').filter(l => l.trim() !== '');
+        const lineasFiltradas = this.filtrarLineasDeNegocio(lineas);
+        const lineasParaMostrar = lineasFiltradas.length ? lineasFiltradas : lineas;
 
         function parseTimestampPrefix(line) {
             const part = (line || '').split(' - ')[0] || '';
@@ -188,13 +199,13 @@ class ExtraController {
             return isNaN(alt.getTime()) ? 0 : alt.getTime();
         }
 
-        lineas.sort((a, b) => {
+        lineasParaMostrar.sort((a, b) => {
             const ta = parseTimestampPrefix(a);
             const tb = parseTimestampPrefix(b);
             return tb - ta;
         });
 
-        const contenidoOrdenado = lineas.join('\n');
+        const contenidoOrdenado = lineasParaMostrar.join('\n');
 
         response.send(`
             <!DOCTYPE html>

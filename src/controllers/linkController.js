@@ -68,6 +68,8 @@ function shapeLinkRow(row) {
   return {
     link_id: Number(row.link_id),
     idEspacio: Number(row.idEspacio),
+    createdBy: row.createdBy === null || row.createdBy === undefined ? null : Number(row.createdBy),
+    creadorNombre: row.creadorNombre || null,
     espacio: espacioNombre,
     // Compatibilidad temporal con frontend antiguo.
     categoria: espacioNombre,
@@ -88,6 +90,20 @@ function ensurePositiveInteger(value, fieldName) {
     throw new ServerError(`${fieldName} invalido`, 400);
   }
   return n;
+}
+
+function normalizeActor(actor) {
+  if (actor && typeof actor === 'object') {
+    return {
+      idUsuario: Number(actor.idUsuario),
+      nombre: String(actor.nombre || 'desconocido')
+    };
+  }
+
+  return {
+    idUsuario: Number(actor),
+    nombre: 'desconocido'
+  };
 }
 
 /* =========================
@@ -113,7 +129,8 @@ function queryRun(sql, params = []) {
 class LinkController {
 
   async listarLinks(request, response) {
-    const idUsuario = request.user.idUsuario;
+    const actor = normalizeActor(request.user);
+    const idUsuario = actor.idUsuario;
     const {
       idEspacio = '',
       categoria = '',
@@ -153,6 +170,7 @@ class LinkController {
     }
 
     const rows = await this.obtenerTodos(idUsuario);
+
     return apiResponse.success(response, rows, 'Links obtenidos');
   }
 
@@ -168,7 +186,7 @@ class LinkController {
 
   async crearLink(request, response) {
     const { idEspacio = null, nombre, comentario, direccion } = request.body;
-    const result = await this.crear(idEspacio, nombre, comentario, direccion, request.user.idUsuario);
+    const result = await this.crear(idEspacio, nombre, comentario, direccion, request.user);
     return apiResponse.created(response, result, 'Link creado con exito');
   }
 
@@ -180,19 +198,19 @@ class LinkController {
       nombre,
       comentario,
       direccion,
-      request.user.idUsuario
+      request.user
     );
     return apiResponse.success(response, result, 'Link actualizado con exito');
   }
 
   async eliminarLink(request, response) {
-    const result = await this.eliminar(request.params.id, request.user.idUsuario);
+    const result = await this.eliminar(request.params.id, request.user);
     return apiResponse.success(response, result, 'Link eliminado con exito');
   }
 
   async buscarLinks(request, response) {
     const { idEspacio = '', categoria = '', nombre = '', comentario = '', direccion = '' } = request.body;
-    const rows = await this.buscar(idEspacio, nombre, comentario, direccion, request.user.idUsuario, categoria);
+    const rows = await this.buscar(idEspacio, nombre, comentario, direccion, request.user, categoria);
     return apiResponse.success(response, rows, 'Busqueda realizada con exito');
   }
 
@@ -236,12 +254,15 @@ class LinkController {
         l.link_id,
         l.idEspacio,
         e.denominacion AS espacio,
+        l.createdBy,
+        u.nombre AS creadorNombre,
         l.nombre,
         l.comentario,
         l.direccion,
         l.created_at
       FROM links l
       INNER JOIN Espacios e ON e.idEspacio = l.idEspacio
+      LEFT JOIN Usuarios u ON u.idUsuario = l.createdBy
       WHERE l.idEspacio IN (${placeholders})
       ORDER BY e.denominacion DESC, l.link_id DESC
     `;
@@ -269,7 +290,10 @@ class LinkController {
     return shaped;
   }
 
-  async crear(idEspacio, nombre, comentario, direccion, idUsuario) {
+  async crear(idEspacio, nombre, comentario, direccion, actorContext) {
+    const actor = normalizeActor(actorContext);
+    const actorId = actor.idUsuario;
+    const actorNombre = actor.nombre;
     const espacioId = ensurePositiveInteger(idEspacio, 'idEspacio');
     const nombreTexto = String(nombre || '').trim();
     const direccionTexto = String(direccion || '').trim();
@@ -278,18 +302,20 @@ class LinkController {
       throw new ServerError('Campos obligatorios incompletos', 400);
     }
 
-    const permisos = await this.validarPermisoEspacio(idUsuario, espacioId, 'create');
+    const permisos = await this.validarPermisoEspacio(actorId, espacioId, 'create');
 
     const { texto: nomLimpia } = validarXSS(nombreTexto);
     const { texto: comLimpia } = validarXSS(comentario || '');
     const { texto: dirLimpia } = validarXSS(direccionTexto);
 
-    const newLink = new Link(espacioId, nomLimpia, comLimpia, dirLimpia);
+    const newLink = new Link(espacioId, nomLimpia, comLimpia, dirLimpia, actorId);
 
     if (useMockStore()) {
       const item = {
         link_id: nextMockId++,
         idEspacio: espacioId,
+        createdBy: actorId,
+        creadorNombre: actorNombre,
         espacio: permisos.categoria,
         nombre: newLink.nombre,
         comentario: newLink.comentario,
@@ -298,7 +324,7 @@ class LinkController {
       };
       mockLinks.push(item);
 
-      observer.notificar(`[CREAR] Nombre: ${nomLimpia}, Comentario: ${comLimpia}, Direccion: ${dirLimpia}`);
+      observer.notificar(`[CREAR] usuario:${actorNombre} espacio:${permisos.categoria} Nombre:${nomLimpia} Comentario:${comLimpia} Direccion:${dirLimpia}`);
 
       return {
         success: true,
@@ -308,7 +334,7 @@ class LinkController {
 
     const result = await queryRun(Consulta.INSERT_LINK, newLink.toArray());
 
-    observer.notificar(`[CREAR] Nombre: ${nomLimpia}, Comentario: ${comLimpia}, Direccion: ${dirLimpia}`);
+    observer.notificar(`[CREAR] usuario:${actorNombre} espacio:${permisos.categoria} Nombre:${nomLimpia} Comentario:${comLimpia} Direccion:${dirLimpia}`);
 
     return {
       success: true,
@@ -316,8 +342,11 @@ class LinkController {
     };
   }
 
-  async actualizar(id, idEspacio, nombre, comentario, direccion, idUsuario) {
-    const existe = await this.obtenerPorId(id, idUsuario, 'manage');
+  async actualizar(id, idEspacio, nombre, comentario, direccion, actorContext) {
+    const actor = normalizeActor(actorContext);
+    const actorId = actor.idUsuario;
+    const actorNombre = actor.nombre;
+    const existe = await this.obtenerPorId(id, actorId, 'manage');
     if (!existe) throw new ServerError('Link no encontrado', 404);
 
     const espacioId = ensurePositiveInteger(idEspacio, 'idEspacio');
@@ -328,7 +357,7 @@ class LinkController {
       throw new ServerError('Campos obligatorios incompletos', 400);
     }
 
-    const permisos = await this.validarPermisoEspacio(idUsuario, espacioId, 'manage');
+    const permisos = await this.validarPermisoEspacio(actorId, espacioId, 'manage');
 
     const { texto: nomLimpia } = validarXSS(nombreTexto);
     const { texto: comLimpia } = validarXSS(comentario || '');
@@ -357,16 +386,19 @@ class LinkController {
       const antes = existe || {};
       const antesStr = `Nombre: ${antes.nombre || ''}, Comentario: ${antes.comentario || ''}, Direccion: ${antes.direccion || ''}`;
       const despuesStr = `Nombre: ${nomLimpia}, Comentario: ${comLimpia}, Direccion: ${dirLimpia}`;
-      observer.notificar(`[MODIFICAR] ID: ${id}, ANTES: ${antesStr}, DESPUES: ${despuesStr}`);
+      observer.notificar(`[MODIFICAR] usuario:${actorNombre} ID:${id} espacio_antes:${antes.espacio || '-'} espacio_despues:${permisos.categoria} ANTES:${antesStr} DESPUES:${despuesStr}`);
     } catch (_err) {
-      observer.notificar(`[MODIFICAR] ${nomLimpia}`);
+      observer.notificar(`[MODIFICAR] usuario:${actorNombre} ID:${id} Nombre:${nomLimpia}`);
     }
 
     return { success: true };
   }
 
-  async eliminar(id, idUsuario) {
-    const existe = await this.obtenerPorId(id, idUsuario, 'manage');
+  async eliminar(id, actorContext) {
+    const actor = normalizeActor(actorContext);
+    const actorId = actor.idUsuario;
+    const actorNombre = actor.nombre;
+    const existe = await this.obtenerPorId(id, actorId, 'manage');
     if (!existe) throw new ServerError('Link no encontrado', 404);
 
     if (useMockStore()) {
@@ -381,15 +413,18 @@ class LinkController {
 
     try {
       const antes = existe || {};
-      observer.notificar(`[BORRAR] ID: ${id}, Nombre: ${antes.nombre || ''}, Comentario: ${antes.comentario || ''}, Direccion: ${antes.direccion || ''}`);
+      observer.notificar(`[BORRAR] usuario:${actorNombre} ID:${id} espacio:${antes.espacio || '-'} Nombre:${antes.nombre || ''} Comentario:${antes.comentario || ''} Direccion:${antes.direccion || ''}`);
     } catch (_err) {
-      observer.notificar(`[BORRAR] ${id}`);
+      observer.notificar(`[BORRAR] usuario:${actorNombre} ID:${id}`);
     }
 
     return { success: true };
   }
 
-  async buscar(idEspacio = '', nombre = '', comentario = '', direccion = '', idUsuario, categoria = '') {
+  async buscar(idEspacio = '', nombre = '', comentario = '', direccion = '', actorContext, categoria = '') {
+    const actor = normalizeActor(actorContext);
+    const actorId = actor.idUsuario;
+    const actorNombre = actor.nombre;
     const espacioRaw = String(idEspacio || '').trim();
     const categoriaRaw = String(categoria || '').trim();
     const nombreRaw = String(nombre || '').trim();
@@ -400,18 +435,21 @@ class LinkController {
       throw new ServerError('Complete al menos un campo para buscar', 400);
     }
 
-    let idsPermitidos = await espacioService.listarIdsEspaciosAccesiblesUsuario(idUsuario);
+    let idsPermitidos = await espacioService.listarIdsEspaciosAccesiblesUsuario(actorId);
     if (!idsPermitidos.length) return [];
+    let espacioNombreLog = 'todos-mis-espacios';
 
     if (espacioRaw) {
-      const permisos = await this.validarPermisoEspacio(idUsuario, espacioRaw, 'read');
+      const permisos = await this.validarPermisoEspacio(actorId, espacioRaw, 'read');
       idsPermitidos = [Number(permisos.idEspacio)];
+      espacioNombreLog = String(permisos.categoria || 'espacio');
     } else if (categoriaRaw) {
-      const permisos = await espacioService.obtenerPermisosPorCategoria(idUsuario, categoriaRaw);
+      const permisos = await espacioService.obtenerPermisosPorCategoria(actorId, categoriaRaw);
       if (!permisos.espacioExiste || !permisos.canRead) {
         throw new ServerError('No tiene permisos para ver links de este espacio', 403);
       }
       idsPermitidos = [Number(permisos.idEspacio)];
+      espacioNombreLog = String(permisos.categoria || categoriaRaw || 'espacio');
     }
 
     if (useMockStore()) {
@@ -423,6 +461,17 @@ class LinkController {
         const byDireccion = !direccionRaw || String(item.direccion || '').toLowerCase().includes(direccionRaw.toLowerCase());
         return byEspacio && byNombre && byComentario && byDireccion;
       }).sort((a, b) => String(a.espacio || '').localeCompare(String(b.espacio || '')));
+
+      try {
+        const criterios = [];
+        criterios.push(`espacio:${espacioNombreLog}`);
+        if (nombreRaw) criterios.push(`nombre:${nombreRaw}`);
+        if (comentarioRaw) criterios.push(`comentario:${comentarioRaw}`);
+        if (direccionRaw) criterios.push(`direccion:${direccionRaw}`);
+        observer.notificar(`[BUSCAR] usuario:${actorNombre} ${criterios.join('|')}`);
+      } catch (_err) {
+        // No interrumpir flujo por logging.
+      }
 
       return rows.map(shapeLinkRow);
     }
@@ -452,12 +501,15 @@ class LinkController {
         l.link_id,
         l.idEspacio,
         e.denominacion AS espacio,
+        l.createdBy,
+        u.nombre AS creadorNombre,
         l.nombre,
         l.comentario,
         l.direccion,
         l.created_at
       FROM links l
       INNER JOIN Espacios e ON e.idEspacio = l.idEspacio
+      LEFT JOIN Usuarios u ON u.idUsuario = l.createdBy
       WHERE ${where.join(' AND ')}
       ORDER BY e.denominacion ASC, l.nombre ASC
     `;
@@ -466,11 +518,11 @@ class LinkController {
 
     try {
       const criterios = [];
-      if (idsPermitidos.length === 1) criterios.push(`idEspacio:${idsPermitidos[0]}`);
+      criterios.push(`espacio:${espacioNombreLog}`);
       if (nombreRaw) criterios.push(`nombre:${nombreRaw}`);
       if (comentarioRaw) criterios.push(`comentario:${comentarioRaw}`);
       if (direccionRaw) criterios.push(`direccion:${direccionRaw}`);
-      observer.notificar(`[BUSCAR] ${criterios.join('|')}`);
+      observer.notificar(`[BUSCAR] usuario:${actorNombre} ${criterios.join('|')}`);
     } catch (_err) {
       // No interrumpir flujo por logging.
     }
