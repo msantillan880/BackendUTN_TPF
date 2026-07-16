@@ -1,5 +1,8 @@
 import swaggerJSDoc from 'swagger-jsdoc';
 
+const APP_BASE_URL = String(process.env.APP_BASE_URL || 'https://backendutn-tpf.onrender.com').trim();
+const APP_BASE_URL_NORMALIZED = APP_BASE_URL.replace(/\/+$/, '');
+
 const options = {
     definition: {
         openapi: '3.0.3',
@@ -9,6 +12,10 @@ const options = {
             description: 'API para gestion de links y espacios multiusuario.'
         },
         servers: [
+            {
+                url: APP_BASE_URL_NORMALIZED,
+                description: 'Servidor produccion (Render)'
+            },
             {
                 url: 'http://localhost:5000',
                 description: 'Servidor local'

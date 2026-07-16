@@ -1,0 +1,103 @@
+RESUMEN CORTO PARA PRUEBAS DEL DOCENTE
+Proyecto: BackendUTN_TPF
+Fecha: 2026-07-16
+
+============================================================
+1) URLS PUBLICAS
+============================================================
+Frontend:
+- https://bookmarksutn-tpf.onrender.com
+
+Backend (API):
+- https://backendutn-tpf.onrender.com
+
+Nota Render (backend):
+- Definir APP_BASE_URL=https://backendutn-tpf.onrender.com para Swagger en produccion.
+
+Swagger (OpenAPI UI):
+- https://backendutn-tpf.onrender.com/api-docs
+
+OpenAPI JSON:
+- https://backendutn-tpf.onrender.com/api-docs.json
+
+============================================================
+2) DATOS DE ACCESO PARA PRUEBAS
+============================================================
+Usuario 1 (visitante):
+- email: prueba.usuario1.bookmarksutn@gmail.com
+- password: bookmarksutn.2026
+
+Usuario 2 (owner): - se puede abrir en otro navegador distinto -
+- email: prueba.usuario2.bookmarksutn@gmail.com
+- password: bookmarksutn.2026
+
+Usuario 3 (opcional para prueba cruzada):
+- nombre: xxxxxx
+- email: xxxxf@mail.com
+- password:xxxx
+
+============================================================
+3) BASE URL POSTMAN
+============================================================
+baseUrl = https://backendutn-tpf.onrender.com
+
+Coleccion incluida en repositorio:
+- postman_collection_bookmarks.json
+
+Duracion de sesion JWT:
+- Configurada por variable JWT_ACCESS_EXPIRES (actual por defecto: 15m)
+
+============================================================
+4) PRUEBAS RAPIDAS SUGERIDAS (10-15 MIN)
+============================================================
+A. Frontend
+1. Iniciar sesion con usuario1.
+2. Crear espacio publico: "Reclamo Islas Malvinas".
+3. Cargar 4 links y verificar tabla.
+    
+  1) https://www.cancilleria.gob.ar/es/politica-exterior/cuestion-malvinas
+  2) https://www.argentina.gob.ar/educacion/efemerides/reclamo-malvinas
+  3) https://www.un.org/decolonization/es/nsgt/falkland-islands-malvinas
+  4) https://www.britannica.com/place/Falkland-Islands
+- Esperado: los 4 links aparecen en tabla/listado del espacio.
+4. Abrir sesion aparte con usuario2.
+5. Crear espacio privado: "Musculacion" y cargar 3 links.
+    1) https://www.mayoclinic.org/healthy-lifestyle/fitness/in-depth/strength-training/art-20046670
+    2) https://www.cdc.gov/physical-activity-basics/adding-activity/strength-training.html
+    3) https://www.nhs.uk/live-well/exercise/strength-exercises/
+6. Cambiar espacio Musculacion a publico.
+7. Probar solicitud/aprobacion de ingreso con otro usuario.
+8. Descargar HTML de espacios.
+9. Abrir logs.
+10. Abrir PDF/manual de explicacion.
+
+B. Backend (Postman)
+1. POST /api/auth/login (owner) -> guardar token.
+2. GET /api/auth/me -> validar autenticacion.
+3. POST /api/espacios -> crear espacio.
+4. POST /api/espacios/:id/solicitudes (visitante).
+5. POST /api/links (visitante sin aprobar) -> esperado 403.
+6. PUT /api/espacios/:id/solicitudes/:idUsuario/aprobar (owner).
+7. POST /api/links (visitante aprobado) -> esperado 201.
+8. POST /api/espacios/:id/generar-html.
+9. GET /api/log-view (con header Authorization: Bearer <token>)
+10. Revisar Swagger para trazabilidad de endpoints.
+
+============================================================
+5) RESULTADOS ESPERADOS CLAVE
+============================================================
+- Login y /auth/me responden 200.
+- Usuario sin permiso recibe 403 en operaciones restringidas.
+- Luego de aprobacion del owner, el usuario puede crear links.
+- Export HTML funciona.
+- Logs visibles para auditoria.
+
+============================================================
+6) EVIDENCIAS MINIMAS A ADJUNTAR
+============================================================
+- Captura de frontend desplegado.
+- Captura de Swagger.
+- Captura login 200 con token en Postman.
+- Captura 403 por falta de permisos.
+- Captura aprobacion + operacion exitosa posterior.
+- Captura descarga HTML y vista de logs.

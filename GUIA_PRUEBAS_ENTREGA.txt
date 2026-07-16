@@ -1,0 +1,179 @@
+GUIA DE PRUEBAS - ENTREGA FINAL (FRONTEND + BACKEND/POSTMAN)
+Proyecto: BackendUTN_TPF
+Fecha: 2026-07-16
+
+====================================================================
+1) DATOS BASE
+====================================================================
+Backend publico:
+- https://backendutn-tpf.onrender.com
+
+Frontend publico (completar URL final):
+- https://bookmarksutn-tpf.onrender.com
+
+Swagger:
+- https://backendutn-tpf.onrender.com/api-docs
+
+Coleccion Postman:
+- postman_collection_bookmarks.json
+
+Credenciales sugeridas para demo:
+- Usuario 1 (visitante):
+  email: prueba.usuario1.bookmarksutn@gmail.com
+  password: bookmarksutn.2026
+
+- Usuario 2 (owner):
+  email: prueba.usuario2.bookmarksutn@gmail.com
+  password: bookmarksutn.2026
+
+- Usuario 3 (nuevo para prueba cruzada):
+  nombre: usuario3_prueba
+  email: usuario3.prueba+tpf@mail.com
+  password: bookmarksutn.2026
+
+====================================================================
+2) PRUEBAS FRONTEND (MANUALES)
+====================================================================
+Objetivo: validar que el frontend separado consume el backend desplegado
+correctamente y que se cumplen reglas de negocio.
+
+F1. Carga inicial
+- Accion: abrir la URL publica del frontend.
+- Esperado: interfaz visible, sin errores de carga de JS/CSS.
+
+F2. Login usuario1
+- Accion: iniciar sesion con usuario1.
+- Esperado: login exitoso, sesion activa.
+
+F3. Crear espacio publico "Reclamo Islas Malvinas" (usuario1)
+- Accion: crear espacio con tipo "publico".
+- Esperado: espacio creado y visible en el selector/listado.
+
+F4. Alta de 4 links en "Reclamo Islas Malvinas" (usuario1)
+- Cargar:
+  1) https://www.cancilleria.gob.ar/es/politica-exterior/cuestion-malvinas
+  2) https://www.argentina.gob.ar/educacion/efemerides/reclamo-malvinas
+  3) https://www.un.org/decolonization/es/nsgt/falkland-islands-malvinas
+  4) https://www.britannica.com/place/Falkland-Islands
+- Esperado: los 4 links aparecen en tabla/listado del espacio.
+
+F5. Login usuario2 en otro navegador
+- Accion: abrir ventana incognito u otro navegador y loguear usuario2.
+- Esperado: sesion independiente de usuario1.
+
+F6. Crear espacio privado "Musculacion" (usuario2)
+- Esperado: espacio creado con tipo privado.
+
+F7. Alta de 3 links en "Musculacion" (usuario2)
+- Cargar:
+  1) https://www.mayoclinic.org/healthy-lifestyle/fitness/in-depth/strength-training/art-20046670
+  2) https://www.cdc.gov/physical-activity-basics/adding-activity/strength-training.html
+  3) https://www.nhs.uk/live-well/exercise/strength-exercises/
+- Esperado: los 3 links aparecen en el espacio Musculacion.
+
+F8. Cambio de tipo de espacio: privado -> publico (usuario2 owner)
+- Accion: editar espacio Musculacion y cambiar tipo a publico.
+- Esperado: cambio persistido correctamente.
+
+F9. Prueba con usuario3 (nuevo)
+- Accion: registrar/verificar/login usuario3.
+- Accion: intentar operar sobre espacio sin permisos.
+- Esperado: bloqueo (403) cuando no corresponde.
+- Accion: solicitar ingreso y luego aprobar desde owner.
+- Esperado: tras aprobar, usuario3 puede operar segun permisos.
+
+F10. Exportaciones y evidencias
+- Accion: descargar HTML de "Reclamo Islas Malvinas".
+- Accion: descargar HTML de "Musculacion".
+- Accion: abrir vista de logs.
+- Accion: abrir PDF/manual de explicacion.
+- Esperado: descargas/visualizaciones correctas.
+
+====================================================================
+3) PRUEBAS BACKEND CON POSTMAN
+====================================================================
+Objetivo: validar endpoints y reglas de autorizacion con evidencia tecnica.
+
+Configurar variables de coleccion:
+- baseUrl = https://backendutn-tpf.onrender.com
+- ownerEmail = prueba.usuario2.bookmarksutn@gmail.com
+- ownerPassword = bookmarksutn.2026
+- visitorEmail = prueba.usuario1.bookmarksutn@gmail.com
+- visitorPassword = bookmarksutn.2026
+
+B1. Swagger/API docs
+- GET {{baseUrl}}/api-docs
+- Esperado: docs accesible.
+
+B2. Login owner
+- POST {{baseUrl}}/api/auth/login
+- Body:
+  {"email":"{{ownerEmail}}","password":"{{ownerPassword}}"}
+- Esperado: 200 + accessToken (guardar en accessToken).
+
+B3. Auth me owner
+- GET {{baseUrl}}/api/auth/me
+- Header: Authorization Bearer {{accessToken}}
+- Esperado: 200 + user.
+
+B4. Owner crea espacio privado
+- POST {{baseUrl}}/api/espacios
+- Header auth bearer
+- Body:
+  {"denominacion":"EspacioPostmanDemo","tipoEspacio":"privado"}
+- Esperado: 201 + idEspacio (guardar espacioId).
+
+B5. Login visitante
+- POST {{baseUrl}}/api/auth/login
+- Body:
+  {"email":"{{visitorEmail}}","password":"{{visitorPassword}}"}
+- Esperado: 200 + accessToken visitante.
+
+B6. Visitante solicita ingreso al espacio
+- POST {{baseUrl}}/api/espacios/{{espacioId}}/solicitudes
+- Esperado: 201 (pendiente).
+
+B7. Visitante intenta crear link sin aprobar
+- POST {{baseUrl}}/api/links
+- Body:
+  {"idEspacio":{{espacioId}},"nombre":"Prueba sin permiso","comentario":"Debe fallar","direccion":"https://example.com"}
+- Esperado: 403.
+
+B8. Owner aprueba solicitud
+- (loguear nuevamente owner y usar su token)
+- PUT {{baseUrl}}/api/espacios/{{espacioId}}/solicitudes/{{visitorUserId}}/aprobar
+- Esperado: 200.
+
+B9. Visitante crea link luego de aprobacion
+- (token visitante)
+- POST {{baseUrl}}/api/links
+- Body:
+  {"idEspacio":{{espacioId}},"nombre":"Prueba autorizada","comentario":"Luego de aprobacion","direccion":"https://www.wikipedia.org"}
+- Esperado: 201.
+
+B10. Export HTML y log
+- POST {{baseUrl}}/api/espacios/{{espacioId}}/generar-html
+- GET {{baseUrl}}/api/log-view?token={{accessToken}}
+- Esperado: export correcto y logs visibles.
+
+====================================================================
+4) EVIDENCIAS A ADJUNTAR
+====================================================================
+- Captura de frontend desplegado (URL visible).
+- Captura de Swagger (/api-docs).
+- Captura de Postman con login 200 + token.
+- Captura de Postman con prueba 403 (sin permiso).
+- Captura de aprobacion y prueba exitosa posterior.
+- Capturas de descarga HTML (2 espacios).
+- Captura de vista de logs.
+
+====================================================================
+5) CHECKLIST DE CIERRE
+====================================================================
+[ ] Repos separados (frontend y backend)
+[ ] Frontend desplegado publico
+[ ] Backend desplegado publico
+[ ] Swagger accesible
+[ ] Coleccion Postman incluida
+[ ] 10 pruebas ejecutadas con evidencia
+[ ] Permisos y autorizacion verificados (403/200)
