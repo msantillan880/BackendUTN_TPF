@@ -12,7 +12,6 @@ Este proyecto es una aplicación de administración de marcadores (bookmarks) im
 
 Estructura principal
 
-- `public/` — front-end estático (HTML/CSS/JS)
 - `src/routes/` — rutas de Express
 - `src/controllers/` — lógica de negocio (`LinkController`)
 - `src/db/` — inicialización de DB y queries (`queries.js`)
@@ -41,7 +40,7 @@ npm install
 npm start
 ```
 
-3. Interactuar con la API o la UI en `public/`.
+3. Probar la API con Swagger o Postman.
 
 Documentacion Swagger (para entrega)
 
@@ -170,20 +169,14 @@ curl -s -X POST http://localhost:5000/api/auth/login \
 
 4. Usar el `accessToken` en `Authorization: Bearer ...` para endpoints protegidos.
 
-## Prueba desde aplicacion web
+## Frontend desacoplado
 
-- Abrir `http://localhost:5000/auth-demo.html`
-- Esa vista permite probar:
-  - register + verify
-  - login + me
-  - forgot-password + reset-password
-  - llamadas a endpoints protegidos con Bearer token
+La catedra requiere repositorios separados.
 
-Tambien en la app principal (`/`) se puede registrar usuario nuevo desde el panel de ingreso:
+- Backend (este repositorio): API + DB + auth + documentacion.
+- Frontend (repositorio separado): UI web que consume la API.
 
-- Link: `Sos nuevo, registrate aqui` (esquina inferior derecha del panel, arriba de `Recuperar contraseña`).
-- El registro solicita `nombre`, `email` y `password` (password de aplicacion).
-- Luego se envia mail de verificacion y solo cuando el usuario confirma su casilla se habilita login.
+Frontend actual: https://github.com/msantillan880/FrontendUTN_TPF
 
 Pasos para ejecutar con MySQL:
 
@@ -210,9 +203,9 @@ Resumen de próximos pasos sugeridos
 
 ## Estado actual (post-demo)
 
-- El frontend multiusuario usa datos persistidos en MySQL para usuarios, espacios, membresias y links.
+- Backend API-only en este repositorio.
 - Se mantienen `usuario1` y `usuario2` como usuarios base para pruebas diarias.
-- Los links se asocian al espacio por `categoria = nombreDelEspacioEnMayusculas` (puente temporal hasta agregar `idEspacio` en `links`).
+- Los links se asocian al espacio por `idEspacio`.
 
 ## Re-seed para pruebas diarias
 

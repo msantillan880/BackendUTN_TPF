@@ -4,7 +4,6 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import swaggerUi from 'swagger-ui-express';
@@ -36,7 +35,6 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/api-docs.json', (req, res) => {
   res.json(swaggerSpec);
