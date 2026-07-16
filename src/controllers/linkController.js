@@ -163,7 +163,7 @@ class LinkController {
         nombre,
         comentario,
         direccion,
-        idUsuario,
+        actor,
         categoriaFiltro
       );
       return apiResponse.success(response, rows, 'Busqueda realizada con exito');
