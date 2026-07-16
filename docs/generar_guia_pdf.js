@@ -607,5 +607,32 @@ bullet('Mejora sugerida: tests de integracion automatizados.');
 bullet('La migracion de links a idEspacio como FK real ya esta implementada.');
 paragraph('Fin de la guia.');
 
+doc.addPage();
+
+sectionTitle('14) Estado de despliegue y validacion final (Clever + Render)');
+paragraph('Se registro avance exitoso de despliegue y validaciones end-to-end sobre infraestructura cloud para la entrega final.');
+
+subsectionTitle('Resumen de estado');
+bullet('Migracion local -> Clever Cloud ejecutada con exito (4/4 pasos completados).');
+bullet('Normalizacion post-import ejecutada: links.createdBy completado cuando estaba NULL.');
+bullet('Validacion SQL en Clever Cloud: links_sin_agregado_por = 0.');
+bullet('Render configurado con variables de entorno del entorno productivo (incluyendo MYSQL_URI y APP_BASE_URL).');
+bullet('Deploy en Render finalizado sin errores de conexion MySQL en logs.');
+bullet('Swagger publico operativo en /api-docs.');
+bullet('Postman: login en entorno Render con respuesta 200 OK y accessToken.');
+
+subsectionTitle('Evidencia tecnica validada');
+numbered([
+    'Conectividad directa a la base de Clever Cloud confirmada por CLI MySQL.',
+    'Migracion de datos finalizada y limpieza de dump temporal realizada.',
+    'Aplicacion Render levantada con mensaje de servicio activo y puerto operativo.',
+    'Documentacion Swagger cargada desde URL publica.',
+    'Prueba funcional de autenticacion en Postman sobre backend deployado.'
+]);
+
+subsectionTitle('Conclusion operativa');
+paragraph('La aplicacion quedo operativa en cloud con persistencia MySQL externa, autenticacion funcional y endpoints accesibles para evaluacion.');
+paragraph('El estado actual es apto para demostracion y entrega final.');
+
 doc.end();
 console.log(`PDF generado en: ${outputPath}`);
