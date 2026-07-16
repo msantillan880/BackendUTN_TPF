@@ -54,6 +54,10 @@ class AuthRepository {
             idUsuario
         ]);
     }
+
+    async deleteUserById(idUsuario) {
+        return queryRun(ConsultaAuth.DELETE_USER_BY_ID, [idUsuario]);
+    }
 }
 
 const authRepository = new AuthRepository();

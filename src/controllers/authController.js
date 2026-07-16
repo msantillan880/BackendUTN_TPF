@@ -6,7 +6,10 @@ class AuthController {
     async register(request, response) {
         const { nombre, email, password } = request.body;
         const result = await authService.register(nombre, email, password);
-        return apiResponse.created(response, result, 'Registro exitoso. Revise su email para verificar la cuenta');
+        const message = result?.verificacionEnviada
+            ? 'Registro exitoso. Revise su email para verificar la cuenta'
+            : 'Registro exitoso. No se pudo enviar el email en este entorno; use verifyUrlDev para verificar la cuenta';
+        return apiResponse.created(response, result, message);
     }
 
     async verifyEmail(request, response) {

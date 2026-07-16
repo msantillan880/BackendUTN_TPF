@@ -45,12 +45,26 @@ class AuthService {
 
         const mailResult = await mailService.enviarVerificacionEmail(normalizedEmail, verificationToken);
 
+        if (!mailResult?.success) {
+            try {
+                await this.repository.deleteUserById(result.insertId);
+            } catch (_rollbackError) {
+                // Si falla rollback, igualmente reportar error de envio.
+            }
+
+            throw new ServerError(
+                'No se pudo enviar el email de verificacion. Intente nuevamente en unos minutos.',
+                503
+            );
+        }
+
         return {
             success: true,
             idUsuario: result.insertId,
             email: normalizedEmail,
             verificacionEnviada: true,
-            verifyUrlDev: mailResult.verifyUrl
+            verifyUrlDev: mailResult?.verifyUrl,
+            mailError: null
         };
     }
 
@@ -142,7 +156,8 @@ class AuthService {
         return {
             success: true,
             message: 'Si el email existe, se envio un enlace de recuperacion',
-            resetUrlDev: mailResult.resetUrl
+            resetUrlDev: mailResult?.resetUrl,
+            recuperacionEnviada: Boolean(mailResult?.success)
         };
     }
 

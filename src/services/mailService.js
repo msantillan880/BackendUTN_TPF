@@ -95,20 +95,31 @@ class MailService {
             note: 'Si usted no creo esta cuenta, puede ignorar este mensaje.'
         });
 
-        const info = await getTransporter().sendMail({
-            from: SMTP_FROM,
-            to: emailDestino,
-            subject: 'Activacion de cuenta - BookmarksUTN',
-            text: `Bienvenido. Verifica tu cuenta en: ${verifyUrl}`,
-            html
-        });
+        try {
+            const info = await getTransporter().sendMail({
+                from: SMTP_FROM,
+                to: emailDestino,
+                subject: 'Activacion de cuenta - BookmarksUTN',
+                text: `Bienvenido. Verifica tu cuenta en: ${verifyUrl}`,
+                html
+            });
 
-        return {
-            success: true,
-            preview: info?.message || null,
-            messageId: info?.messageId || null,
-            verifyUrl
-        };
+            return {
+                success: true,
+                preview: info?.message || null,
+                messageId: info?.messageId || null,
+                verifyUrl
+            };
+        } catch (error) {
+            console.error('No se pudo enviar email de verificacion:', error && error.message);
+            return {
+                success: false,
+                preview: null,
+                messageId: null,
+                verifyUrl,
+                error: String(error && error.message || 'Error SMTP')
+            };
+        }
     }
 
     async enviarResetPassword(emailDestino, resetToken) {
@@ -121,20 +132,31 @@ class MailService {
             note: 'Si usted no solicito este cambio, ignore este correo.'
         });
 
-        const info = await getTransporter().sendMail({
-            from: SMTP_FROM,
-            to: emailDestino,
-            subject: 'Recuperacion de contrasena - BookmarksUTN',
-            text: `Recibimos una solicitud para restablecer tu contrasena. Usa este enlace: ${resetUrl}`,
-            html
-        });
+        try {
+            const info = await getTransporter().sendMail({
+                from: SMTP_FROM,
+                to: emailDestino,
+                subject: 'Recuperacion de contrasena - BookmarksUTN',
+                text: `Recibimos una solicitud para restablecer tu contrasena. Usa este enlace: ${resetUrl}`,
+                html
+            });
 
-        return {
-            success: true,
-            preview: info?.message || null,
-            messageId: info?.messageId || null,
-            resetUrl
-        };
+            return {
+                success: true,
+                preview: info?.message || null,
+                messageId: info?.messageId || null,
+                resetUrl
+            };
+        } catch (error) {
+            console.error('No se pudo enviar email de recuperacion:', error && error.message);
+            return {
+                success: false,
+                preview: null,
+                messageId: null,
+                resetUrl,
+                error: String(error && error.message || 'Error SMTP')
+            };
+        }
     }
 }
 

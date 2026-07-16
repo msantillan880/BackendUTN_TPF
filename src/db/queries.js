@@ -338,4 +338,9 @@ export class ConsultaAuth {
       updated_at = CURRENT_TIMESTAMP
     WHERE idUsuario = ?
   `;
+
+  static DELETE_USER_BY_ID = `
+    DELETE FROM Usuarios
+    WHERE idUsuario = ?
+  `;
 }
