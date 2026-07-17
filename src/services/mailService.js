@@ -35,6 +35,8 @@ const SMTP_CONNECTION_TIMEOUT_MS = parsePositiveInt(process.env.SMTP_CONNECTION_
 const SMTP_GREETING_TIMEOUT_MS = parsePositiveInt(process.env.SMTP_GREETING_TIMEOUT_MS, 10000);
 const SMTP_SOCKET_TIMEOUT_MS = parsePositiveInt(process.env.SMTP_SOCKET_TIMEOUT_MS, 15000);
 const SMTP_FORCE_IPV4 = String(process.env.SMTP_FORCE_IPV4 || 'true').toLowerCase() === 'true';
+const RESEND_API_KEY = cleanEnv(process.env.RESEND_API_KEY);
+const RESEND_FROM = cleanEnv(process.env.RESEND_FROM, 'onboarding@resend.dev');
 const BREVO_API_KEY = cleanEnv(process.env.BREVO_API_KEY);
 const BREVO_SENDER_EMAIL = cleanEnv(process.env.BREVO_SENDER_EMAIL);
 const BREVO_SENDER_NAME = cleanEnv(process.env.BREVO_SENDER_NAME, 'BookmarksUTN');
@@ -101,6 +103,10 @@ function isSmtpConfigured() {
 
 function canUseBrevoApi() {
     return Boolean(BREVO_API_KEY && BREVO_SENDER_EMAIL);
+}
+
+function canUseResendApi() {
+    return Boolean(RESEND_API_KEY && RESEND_FROM);
 }
 
 function buildSimpleEmailHtml({
@@ -346,9 +352,69 @@ class MailService {
         };
     }
 
+    async sendWithResendApi({ to, subject, text, html }) {
+        if (!canUseResendApi()) {
+            return {
+                success: false,
+                error: 'RESEND_API_KEY o RESEND_FROM no configurado'
+            };
+        }
+
+        if (typeof fetch !== 'function') {
+            return {
+                success: false,
+                error: 'fetch no disponible en runtime para envio por API'
+            };
+        }
+
+        const payload = {
+            from: RESEND_FROM,
+            to: [to],
+            subject,
+            html,
+            text
+        };
+
+        const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${RESEND_API_KEY}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const raw = await response.text();
+        let parsed = null;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (_err) {
+            parsed = null;
+        }
+
+        if (!response.ok) {
+            const detail = parsed?.message || parsed?.error || raw || `HTTP ${response.status}`;
+            return {
+                success: false,
+                error: `Resend API error: ${detail}`
+            };
+        }
+
+        return {
+            success: true,
+            preview: null,
+            messageId: parsed?.id || null
+        };
+    }
+
     async sendMailWithFallback({ to, subject, text, html }) {
+        const wantsResend = MAIL_PROVIDER === 'resend';
         const wantsBrevo = MAIL_PROVIDER === 'brevo';
         const wantsSmtp = MAIL_PROVIDER === 'smtp';
+
+        if (wantsResend) {
+            return this.sendWithResendApi({ to, subject, text, html });
+        }
 
         if (wantsBrevo) {
             return this.sendWithBrevoApi({ to, subject, text, html });
@@ -367,6 +433,15 @@ class MailService {
                 return smtpResult;
             }
 
+            if (canUseResendApi() && (!wantsSmtp || isNetworkConnectionResult(smtpResult))) {
+                const resendResult = await this.sendWithResendApi({ to, subject, text, html });
+                if (resendResult.success) {
+                    console.warn(`SMTP fallo y se uso fallback Resend API: ${smtpResult.error}`);
+                    return resendResult;
+                }
+                console.error(`SMTP fallo (${smtpResult.error}) y fallback Resend tambien fallo: ${resendResult.error}`);
+            }
+
             if (canUseBrevoApi() && (!wantsSmtp || isNetworkConnectionResult(smtpResult))) {
                 const brevoResult = await this.sendWithBrevoApi({ to, subject, text, html });
                 if (brevoResult.success) {
@@ -378,6 +453,10 @@ class MailService {
             }
 
             return smtpResult;
+        }
+
+        if (canUseResendApi()) {
+            return this.sendWithResendApi({ to, subject, text, html });
         }
 
         if (canUseBrevoApi()) {

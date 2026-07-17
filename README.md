@@ -113,9 +113,23 @@ Variables nuevas para autenticacion/email:
 - `EMAIL_VERIFY_TTL_HOURS` (por defecto `24`)
 - `RESET_PASSWORD_TTL_MINUTES` (por defecto `30`)
 - `APP_BASE_URL` (por defecto `http://localhost:5000`)
+- `MAIL_PROVIDER` (`auto`, `smtp`, `resend`, `brevo`)
+- `RESEND_API_KEY`, `RESEND_FROM`
 - `SMTP_SERVICE`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
 
 Nota: si no se configura SMTP, el sistema usa un transporte JSON de desarrollo para poder probar el flujo de verificacion sin envio real.
+
+### Prueba con Resend (recomendado en Render)
+
+Configurar en `.env` o variables del servicio:
+
+```bash
+MAIL_PROVIDER=resend
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxx
+RESEND_FROM="BookmarksUTN <onboarding@resend.dev>"
+```
+
+Para produccion, se recomienda verificar dominio propio en Resend y usar un remitente de ese dominio.
 
 ### Prueba con Gmail (sugerido para profesores)
 
