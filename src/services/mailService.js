@@ -7,7 +7,19 @@ const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
 const SMTP_SECURE = String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
-const SMTP_FROM = process.env.SMTP_FROM || 'BookmarksUTN <no-reply@bookmarksutn.local>';
+const SMTP_FROM = String(process.env.SMTP_FROM || 'BookmarksUTN <no-reply@bookmarksutn.local>')
+    .replace(/[\r\n]+/g, ' ')
+    .trim();
+
+const SMTP_CONNECTION_TIMEOUT_MS = process.env.SMTP_CONNECTION_TIMEOUT_MS
+    ? Number(process.env.SMTP_CONNECTION_TIMEOUT_MS)
+    : 10000;
+const SMTP_GREETING_TIMEOUT_MS = process.env.SMTP_GREETING_TIMEOUT_MS
+    ? Number(process.env.SMTP_GREETING_TIMEOUT_MS)
+    : 10000;
+const SMTP_SOCKET_TIMEOUT_MS = process.env.SMTP_SOCKET_TIMEOUT_MS
+    ? Number(process.env.SMTP_SOCKET_TIMEOUT_MS)
+    : 15000;
 
 let transporter;
 
@@ -56,13 +68,20 @@ function buildSimpleEmailHtml({
 function getTransporter() {
     if (transporter) return transporter;
 
+    const timeoutOptions = {
+        connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+        greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+        socketTimeout: SMTP_SOCKET_TIMEOUT_MS
+    };
+
     if (SMTP_SERVICE && SMTP_USER) {
         transporter = nodemailer.createTransport({
             service: SMTP_SERVICE,
             auth: {
                 user: SMTP_USER,
                 pass: SMTP_PASS
-            }
+            },
+            ...timeoutOptions
         });
     } else if (SMTP_HOST && SMTP_USER) {
         transporter = nodemailer.createTransport({
@@ -72,7 +91,8 @@ function getTransporter() {
             auth: {
                 user: SMTP_USER,
                 pass: SMTP_PASS
-            }
+            },
+            ...timeoutOptions
         });
     } else {
         // Fallback para desarrollo local: no envia email real, pero permite probar el flujo.
