@@ -5,3 +5,5 @@ node_modules/
 *.db-wal
 # Local notas
 docs/
+!docs/
+!docs/ExplicacionTPF.pdf
