@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import dns from 'node:dns';
 
 function cleanEnv(value, fallback = '') {
     if (value === undefined || value === null) return fallback;
@@ -68,7 +69,16 @@ function createSmtpTransport({ host, port, secure }) {
         socketTimeout: SMTP_SOCKET_TIMEOUT_MS
     };
 
-    const networkOptions = SMTP_FORCE_IPV4 ? { family: 4 } : {};
+    const networkOptions = SMTP_FORCE_IPV4
+        ? {
+            family: 4,
+            lookup(hostname, options, callback) {
+                const cb = typeof options === 'function' ? options : callback;
+                const opts = typeof options === 'object' && options !== null ? options : {};
+                dns.lookup(hostname, { ...opts, family: 4, all: false }, cb);
+            }
+        }
+        : {};
 
     return nodemailer.createTransport({
         host,
@@ -167,7 +177,16 @@ function getTransporter() {
                 greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
                 socketTimeout: SMTP_SOCKET_TIMEOUT_MS
             };
-            const networkOptions = SMTP_FORCE_IPV4 ? { family: 4 } : {};
+            const networkOptions = SMTP_FORCE_IPV4
+                ? {
+                    family: 4,
+                    lookup(hostname, options, callback) {
+                        const cb = typeof options === 'function' ? options : callback;
+                        const opts = typeof options === 'object' && options !== null ? options : {};
+                        dns.lookup(hostname, { ...opts, family: 4, all: false }, cb);
+                    }
+                }
+                : {};
 
             transporter = nodemailer.createTransport({
                 service: SMTP_SERVICE,
@@ -205,6 +224,23 @@ function isNetworkConnectionError(error) {
 function canRetrySmtp(error) {
     if (!isNetworkConnectionError(error)) return false;
     return Boolean(getEffectiveSmtpHost() || SMTP_SERVICE);
+}
+
+function isNetworkConnectionResult(result) {
+    if (!result) return false;
+
+    const code = String(result.code || '').toUpperCase();
+    const msg = String(result.error || '').toLowerCase();
+
+    return (
+        code === 'ETIMEDOUT' ||
+        code === 'ENETUNREACH' ||
+        code === 'EHOSTUNREACH' ||
+        code === 'ECONNREFUSED' ||
+        msg.includes('connection timeout') ||
+        msg.includes('enetunreach') ||
+        msg.includes('ehostunreach')
+    );
 }
 
 class MailService {
@@ -331,7 +367,7 @@ class MailService {
                 return smtpResult;
             }
 
-            if (canUseBrevoApi() && !wantsSmtp) {
+            if (canUseBrevoApi() && (!wantsSmtp || isNetworkConnectionResult(smtpResult))) {
                 const brevoResult = await this.sendWithBrevoApi({ to, subject, text, html });
                 if (brevoResult.success) {
                     console.warn(`SMTP fallo y se uso fallback Brevo API: ${smtpResult.error}`);
