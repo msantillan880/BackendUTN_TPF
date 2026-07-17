@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Propuesta de Presentacion - BackendUTN_TPF</title>
+  <style>
+    body { font-family: Calibri, Arial, sans-serif; line-height: 1.35; margin: 28px; color: #1f2937; }
+    h1, h2, h3 { color: #0f3f76; margin-bottom: 6px; }
+    h1 { font-size: 26px; }
+    h2 { font-size: 20px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-top: 24px; }
+    h3 { font-size: 16px; margin-top: 18px; }
+    p { margin: 8px 0; }
+    ul, ol { margin-top: 6px; }
+    .meta { color: #475569; font-size: 13px; }
+    .box { background: #f8fafc; border: 1px solid #dbeafe; padding: 10px 12px; border-radius: 6px; margin: 10px 0; }
+    .diagram { font-family: Consolas, monospace; white-space: pre; background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 6px; border: 1px solid #334155; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0 14px; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px; vertical-align: top; font-size: 13px; }
+    th { background: #eff6ff; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Trabajo Practico Final - Propuesta de Presentacion para Profesor</h1>
+  <p class="meta">Proyecto: BackendUTN_TPF | Fecha: 2026-07-16 | Alumno: Marcelo (completar apellido)</p>
+
+  <h2>1. Objetivo del sistema</h2>
+  <p>
+    El proyecto implementa un backend REST para gestionar bookmarks colaborativos por espacios, con autenticacion,
+    autorizacion por permisos, auditoria de acciones y persistencia en MySQL.
+  </p>
+  <p>
+    El foco de la entrega es el backend. El frontend incluido es de apoyo operativo para demostrar los flujos.
+  </p>
+
+  <h2>2. Justificaciones de diseno (preguntas frecuentes de evaluacion)</h2>
+
+  <h3>2.1 Por que el modelo Usuario no tiene todos los campos de la tabla</h3>
+  <div class="box">
+    <p>
+      La clase de dominio Usuario en la capa de models representa solamente los datos necesarios para ciertos casos de uso
+      (por ejemplo, alta basica desde la gestion de espacios). No busca reflejar 1 a 1 toda la tabla SQL.
+    </p>
+    <p>
+      Campos sensibles o internos (passwordHash, tokens de verificacion y recuperacion, expiraciones, timestamps) se
+      administran en el flujo de autenticacion mediante repositorio/servicio, evitando exponerlos en objetos generales de dominio.
+    </p>
+    <p>
+      Este criterio reduce el acoplamiento, evita transporte accidental de datos sensibles y mantiene el principio de minimo
+      privilegio en cada capa.
+    </p>
+  </div>
+
+  <h3>2.2 Por que no existe un UserController dedicado</h3>
+  <div class="box">
+    <p>
+      No tener un controller exclusivo de usuarios es una decision valida si la logica de usuario esta distribuida por contexto:
+    </p>
+    <ul>
+      <li>AuthController: registro, verificacion, login, recuperacion de password, perfil autenticado.</li>
+      <li>EspacioController: listado/alta/baja de usuarios para operacion multiusuario del dominio.</li>
+    </ul>
+    <p>
+      El criterio aplicado fue agrupar por caso de uso de negocio y no por entidad pura. Si el proyecto creciera,
+      podria crearse UserController para administracion avanzada sin que eso invalide la arquitectura actual.
+    </p>
+  </div>
+
+  <h2>3. Arquitectura implementada</h2>
+  <p>Se adopta una arquitectura en capas con responsabilidades separadas:</p>
+  <ul>
+    <li>Routes: definicion de endpoints y middleware por ruta.</li>
+    <li>Controllers: orquestacion de request/response y codigos HTTP.</li>
+    <li>Services: reglas de negocio y autorizacion.</li>
+    <li>Repositories: acceso SQL a MySQL.</li>
+    <li>Models: objetos de dominio simples.</li>
+    <li>Middleware: JWT, validaciones, auditoria, XSS.</li>
+    <li>Utils/Helpers: tokens, logger, observer, respuestas estandar.</li>
+  </ul>
+
+  <h3>3.1 Diagrama de arquitectura (texto)</h3>
+  <div class="diagram">Cliente Web / Postman
+        |
+        v
+Routes (Express) + Middlewares
+        |
+        v
+Controllers (Auth, Espacio, Link, Extra)
+        |
+        v
+Services (AuthService, EspacioService)
+        |
+        v
+Repositories (AuthRepository, EspacioRepository) + Query helpers
+        |
+        v
+MySQL (Usuarios, Espacios, Espacio_Usuarios, EstadosSolicitudes, links)
+
+Canal transversal: Observer + Winston -> src/logs/registro_logs.log</div>
+
+  <h2>4. Modelo de datos y relaciones</h2>
+
+  <h3>4.1 Tablas principales</h3>
+  <table>
+    <tr><th>Tabla</th><th>Campos relevantes</th><th>Proposito</th></tr>
+    <tr>
+      <td>Usuarios</td>
+      <td>idUsuario, nombre, email, passwordHash, emailVerificado, tokens/ver vencimiento, created_at, updated_at</td>
+      <td>Identidad, autenticacion y estado de verificacion.</td>
+    </tr>
+    <tr>
+      <td>Espacios</td>
+      <td>idEspacio, denominacion, idOwner, tipoEspacio</td>
+      <td>Agrupar bookmarks por comunidad/tema y definir owner.</td>
+    </tr>
+    <tr>
+      <td>Espacio_Usuarios</td>
+      <td>idUsuario, idEspacio, estado, f_solicitud, f_aprobacion, aprobadoPor</td>
+      <td>Relacion N:N usuario-espacio con estado de solicitud.</td>
+    </tr>
+    <tr>
+      <td>EstadosSolicitudes</td>
+      <td>1 pendiente, 2 aprobado, 3 rechazado, 4 expulsado</td>
+      <td>Catalogo normalizado de estados.</td>
+    </tr>
+    <tr>
+      <td>links</td>
+      <td>link_id, idEspacio, nombre, comentario, direccion, createdBy, created_at</td>
+      <td>Entidad principal del sistema: bookmarks.</td>
+    </tr>
+  </table>
+
+  <h3>4.2 Diagrama entidad-relacion (texto)</h3>
+  <div class="diagram">Usuarios (1) ----- (N) Espacios
+   |                    ^
+   | idOwner            |
+   |                    |
+   +-----(N) Espacio_Usuarios (N)-----+
+   |            (estado solicitud)     |
+   |                                   |
+   +-----(1)----- (N) links -----------+
+
+Detalle:
+- Espacios.idOwner -> Usuarios.idUsuario (owner del espacio)
+- Espacio_Usuarios.idUsuario -> Usuarios.idUsuario
+- Espacio_Usuarios.idEspacio -> Espacios.idEspacio
+- Espacio_Usuarios.estado -> EstadosSolicitudes.idEstado
+- links.idEspacio -> Espacios.idEspacio
+- links.createdBy -> Usuarios.idUsuario</div>
+
+  <h2>5. Reglas de negocio implementadas</h2>
+  <ol>
+    <li>Solo usuarios con email verificado pueden iniciar sesion.</li>
+    <li>El owner del espacio puede aprobar/rechazar/expulsar miembros.</li>
+    <li>El owner puede modificar y eliminar links del espacio.</li>
+    <li>Miembro aprobado puede leer y crear links en ese espacio.</li>
+    <li>Usuario sin aprobacion no puede acceder a links del espacio.</li>
+    <li>Las solicitudes de ingreso quedan pendientes hasta resolucion del owner.</li>
+    <li>Al expulsar, se registra trazabilidad de links del usuario en el espacio.</li>
+  </ol>
+
+  <h2>6. Seguridad aplicada</h2>
+  <ul>
+    <li>Hash de passwords con bcrypt.</li>
+    <li>JWT Bearer para rutas protegidas.</li>
+    <li>Verificacion de email por token hasheado con vencimiento.</li>
+    <li>Reset de password por token hasheado con vencimiento.</li>
+    <li>Validacion de request (esquemas auth).</li>
+    <li>Saneamiento XSS en entradas de texto.</li>
+    <li>Manejo de errores con respuesta uniforme.</li>
+  </ul>
+
+  <h2>7. Logging y auditoria</h2>
+  <p>Se registran eventos funcionales y auditoria de requests autenticados.</p>
+
+  <h3>7.1 Eventos de negocio</h3>
+  <ul>
+    <li>[CREAR], [MODIFICAR], [BORRAR], [BUSCAR] en operaciones de links.</li>
+    <li>[APROBAR], [RECHAZAR], [EXPULSAR], [EXPULSAR-LINKS] en ciclo de miembros.</li>
+  </ul>
+
+  <h3>7.2 Auditoria HTTP</h3>
+  <p>
+    Middleware de auditoria registra usuario, metodo, ruta, query, status y tiempo de respuesta.
+    Esto permite defensa tecnica sobre trazabilidad y observabilidad.
+  </p>
+
+  <h3>7.3 Almacenamiento</h3>
+  <p>Salida de logs a archivo de aplicacion y visor HTML para inspeccion rapida.</p>
+
+  <h2>8. Endpoints principales para demostrar en defensa</h2>
+  <table>
+    <tr><th>Modulo</th><th>Endpoint</th><th>Descripcion</th></tr>
+    <tr><td>Auth</td><td>POST /api/auth/register</td><td>Alta de usuario y envio de verificacion.</td></tr>
+    <tr><td>Auth</td><td>GET /api/auth/verify-email?token=...</td><td>Activa cuenta.</td></tr>
+    <tr><td>Auth</td><td>POST /api/auth/login</td><td>Entrega JWT.</td></tr>
+    <tr><td>Auth</td><td>GET /api/auth/me</td><td>Valida autenticacion con Bearer.</td></tr>
+    <tr><td>Espacios</td><td>POST /api/espacios</td><td>Crea espacio como owner autenticado.</td></tr>
+    <tr><td>Espacios</td><td>POST /api/espacios/:id/solicitudes</td><td>Solicita ingreso.</td></tr>
+    <tr><td>Espacios</td><td>PUT /api/espacios/:id/solicitudes/:idUsuario/aprobar</td><td>Owner aprueba solicitud.</td></tr>
+    <tr><td>Links</td><td>POST /api/crear</td><td>Crea bookmark en espacio autorizado.</td></tr>
+    <tr><td>Links</td><td>PUT /api/actualizar/:id</td><td>Modifica bookmark (owner).</td></tr>
+    <tr><td>Links</td><td>DELETE /api/eliminar/:id</td><td>Elimina bookmark (owner).</td></tr>
+  </table>
+
+  <h2>9. Despliegue en produccion</h2>
+  <p>
+    El backend se despliega como aplicacion Node.js, con base MySQL en Clever Cloud.
+    La configuracion admite variables separadas o URI completa para conectar.
+  </p>
+
+  <h3>9.1 Estrategia aplicada</h3>
+  <ol>
+    <li>Provision de MySQL administrado.</li>
+    <li>Carga/migracion de datos de entorno local a entorno remoto.</li>
+    <li>Normalizacion post-import para consistencia de createdBy y usuario base.</li>
+    <li>Inicializacion automatica de esquema al iniciar servidor.</li>
+  </ol>
+
+  <h3>9.2 Variables de entorno clave</h3>
+  <ul>
+    <li>MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE</li>
+    <li>MYSQL_URI o DATABASE_URL (alternativa)</li>
+    <li>JWT_ACCESS_SECRET, JWT_ACCESS_EXPIRES</li>
+    <li>SMTP_* para flujo real de correo</li>
+  </ul>
+
+  <h2>10. Guion sugerido para exposicion (10-12 minutos)</h2>
+  <ol>
+    <li>Presentacion del problema y alcance backend.</li>
+    <li>Arquitectura por capas y por que mejora mantenibilidad.</li>
+    <li>Modelo de datos y relaciones.</li>
+    <li>Flujo completo de auth: registro -> verificacion -> login -> JWT.</li>
+    <li>Flujo multiusuario por espacios y estados de solicitud.</li>
+    <li>Reglas de autorizacion y casos permitidos/no permitidos.</li>
+    <li>Auditoria y logs como evidencia de trazabilidad.</li>
+    <li>Despliegue productivo y variables de entorno.</li>
+    <li>Cierre con mejoras futuras (tests, paginacion, hardening).</li>
+  </ol>
+
+  <h2>11. Preguntas probables del profesor y respuesta corta</h2>
+  <h3>Por que no mapear toda la tabla en Usuario.js?</h3>
+  <p>
+    Porque el modelo de dominio se define por caso de uso. Los campos sensibles de auth se tratan en su modulo especifico,
+    evitando exposicion innecesaria y acoplamiento.
+  </p>
+
+  <h3>Falta UserController?</h3>
+  <p>
+    No necesariamente. La logica de usuario esta segmentada por contexto de negocio (auth y espacios). Es una decision valida.
+  </p>
+
+  <h3>Como se evidencia que hay control de permisos?</h3>
+  <p>
+    En servicios se verifica owner/miembro aprobado antes de habilitar lectura, creacion o gestion de links. Los intentos
+    no autorizados retornan 403 y quedan auditables por logs.
+  </p>
+
+  <h3>Como justificas produccion?</h3>
+  <p>
+    Se usa MySQL administrado, variables de entorno para secretos, script de migracion y normalizacion, y arranque con
+    verificacion de esquema.
+  </p>
+
+  <h2>12. Estado y cierre</h2>
+  <p>
+    La propuesta cumple requerimientos de backend: API, seguridad, persistencia, autorizacion y evidencia operativa.
+    El documento es editable para ajustar nombres, URLs productivas y capturas finales antes de entregar.
+  </p>
+
+  <h2>13. Anexo opcional: justificativo de contingencia SMTP</h2>
+  <div class="box">
+    <p>
+      En la instancia final de deploy se detecto una falla de conectividad SMTP saliente con Gmail desde entorno cloud
+      (timeout de conexion: ETIMEDOUT|CONN). Este escenario se trata como dependencia externa de infraestructura.
+    </p>
+    <p>
+      El backend conserva consistencia: el registro exige envio de verificacion y, ante falla de correo, aplica rollback
+      del alta y retorna 503 controlado.
+    </p>
+  </div>
+  <ul>
+    <li>Evidencia: log de produccion con Connection timeout [ETIMEDOUT|CONN].</li>
+    <li>Mitigaciones aplicadas: prioridad host/puerto, timeouts configurables, forzado IPv4, validacion robusta de variables, reintento por puerto alternativo y mejora de diagnostico.</li>
+    <li>Frase breve de defensa: la incidencia es externa al dominio del backend; la aplicacion responde de forma segura y consistente, sin dejar estados invalidos.</li>
+  </ul>
+</body>
+</html>
