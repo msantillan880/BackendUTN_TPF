@@ -91,9 +91,11 @@ function getTransporter() {
 
     const networkOptions = SMTP_FORCE_IPV4 ? { family: 4 } : {};
 
-    if (SMTP_SERVICE && SMTP_USER) {
+    if (SMTP_HOST && SMTP_USER) {
         transporter = nodemailer.createTransport({
-            service: SMTP_SERVICE,
+            host: SMTP_HOST,
+            port: SMTP_PORT,
+            secure: SMTP_SECURE,
             auth: {
                 user: SMTP_USER,
                 pass: SMTP_PASS
@@ -101,11 +103,9 @@ function getTransporter() {
             ...networkOptions,
             ...timeoutOptions
         });
-    } else if (SMTP_HOST && SMTP_USER) {
+    } else if (SMTP_SERVICE && SMTP_USER) {
         transporter = nodemailer.createTransport({
-            host: SMTP_HOST,
-            port: SMTP_PORT,
-            secure: SMTP_SECURE,
+            service: SMTP_SERVICE,
             auth: {
                 user: SMTP_USER,
                 pass: SMTP_PASS
