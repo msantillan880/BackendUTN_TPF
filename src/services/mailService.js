@@ -20,6 +20,7 @@ const SMTP_GREETING_TIMEOUT_MS = process.env.SMTP_GREETING_TIMEOUT_MS
 const SMTP_SOCKET_TIMEOUT_MS = process.env.SMTP_SOCKET_TIMEOUT_MS
     ? Number(process.env.SMTP_SOCKET_TIMEOUT_MS)
     : 15000;
+const SMTP_FORCE_IPV4 = String(process.env.SMTP_FORCE_IPV4 || 'true').toLowerCase() === 'true';
 
 let transporter;
 
@@ -74,6 +75,8 @@ function getTransporter() {
         socketTimeout: SMTP_SOCKET_TIMEOUT_MS
     };
 
+    const networkOptions = SMTP_FORCE_IPV4 ? { family: 4 } : {};
+
     if (SMTP_SERVICE && SMTP_USER) {
         transporter = nodemailer.createTransport({
             service: SMTP_SERVICE,
@@ -81,6 +84,7 @@ function getTransporter() {
                 user: SMTP_USER,
                 pass: SMTP_PASS
             },
+            ...networkOptions,
             ...timeoutOptions
         });
     } else if (SMTP_HOST && SMTP_USER) {
@@ -92,6 +96,7 @@ function getTransporter() {
                 user: SMTP_USER,
                 pass: SMTP_PASS
             },
+            ...networkOptions,
             ...timeoutOptions
         });
     } else {

@@ -69,7 +69,12 @@ app.use((err, req, res, next) => {
   const message = err.message || 'Error interno del servidor';
 
   if (status >= 500) {
-    console.error('Error no controlado:', err);
+    const isControlledServerError = err && err.constructor && err.constructor.name === 'ServerError';
+    if (isControlledServerError) {
+      console.error('Error controlado de servicio:', err);
+    } else {
+      console.error('Error no controlado:', err);
+    }
   }
 
   res.status(status).json({
