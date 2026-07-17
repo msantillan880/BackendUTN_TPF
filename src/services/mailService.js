@@ -40,6 +40,27 @@ const BREVO_SENDER_NAME = cleanEnv(process.env.BREVO_SENDER_NAME, 'BookmarksUTN'
 
 let transporter;
 
+function isGmailService(value) {
+    return String(value || '').toLowerCase().includes('gmail');
+}
+
+function getEffectiveSmtpHost() {
+    if (SMTP_HOST) return SMTP_HOST;
+    if (isGmailService(SMTP_SERVICE)) return 'smtp.gmail.com';
+    return '';
+}
+
+function getEffectiveSmtpPort() {
+    if (process.env.SMTP_PORT) return SMTP_PORT;
+    if (isGmailService(SMTP_SERVICE)) return 587;
+    return SMTP_PORT;
+}
+
+function getEffectiveSmtpSecure(port = getEffectiveSmtpPort()) {
+    if (process.env.SMTP_SECURE !== undefined) return SMTP_SECURE;
+    return Number(port) === 465;
+}
+
 function createSmtpTransport({ host, port, secure }) {
     const timeoutOptions = {
         connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
@@ -129,29 +150,35 @@ function buildAbsoluteAppUrl(pathnameWithQuery) {
 function getTransporter() {
     if (transporter) return transporter;
 
-    if (SMTP_HOST && SMTP_USER) {
-        transporter = createSmtpTransport({
-            host: SMTP_HOST,
-            port: SMTP_PORT,
-            secure: SMTP_SECURE
-        });
-    } else if (SMTP_SERVICE && SMTP_USER) {
-        const timeoutOptions = {
-            connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
-            greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
-            socketTimeout: SMTP_SOCKET_TIMEOUT_MS
-        };
-        const networkOptions = SMTP_FORCE_IPV4 ? { family: 4 } : {};
+    if ((SMTP_HOST || SMTP_SERVICE) && SMTP_USER) {
+        const host = getEffectiveSmtpHost();
+        const port = getEffectiveSmtpPort();
+        const secure = getEffectiveSmtpSecure(port);
 
-        transporter = nodemailer.createTransport({
-            service: SMTP_SERVICE,
-            auth: {
-                user: SMTP_USER,
-                pass: SMTP_PASS
-            },
-            ...networkOptions,
-            ...timeoutOptions
-        });
+        if (host) {
+            transporter = createSmtpTransport({
+                host,
+                port,
+                secure
+            });
+        } else if (SMTP_SERVICE) {
+            const timeoutOptions = {
+                connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+                greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+                socketTimeout: SMTP_SOCKET_TIMEOUT_MS
+            };
+            const networkOptions = SMTP_FORCE_IPV4 ? { family: 4 } : {};
+
+            transporter = nodemailer.createTransport({
+                service: SMTP_SERVICE,
+                auth: {
+                    user: SMTP_USER,
+                    pass: SMTP_PASS
+                },
+                ...networkOptions,
+                ...timeoutOptions
+            });
+        }
     } else {
         // Fallback para desarrollo local: no envia email real, pero permite probar el flujo.
         transporter = nodemailer.createTransport({
@@ -160,6 +187,24 @@ function getTransporter() {
     }
 
     return transporter;
+}
+
+function isNetworkConnectionError(error) {
+    const code = String(error && error.code || '').toUpperCase();
+    const msg = String(error && error.message || '').toLowerCase();
+
+    return (
+        code === 'ETIMEDOUT' ||
+        code === 'ENETUNREACH' ||
+        code === 'EHOSTUNREACH' ||
+        code === 'ECONNREFUSED' ||
+        msg.includes('connection timeout')
+    );
+}
+
+function canRetrySmtp(error) {
+    if (!isNetworkConnectionError(error)) return false;
+    return Boolean(getEffectiveSmtpHost() || SMTP_SERVICE);
 }
 
 class MailService {
@@ -181,17 +226,14 @@ class MailService {
                 messageId: info?.messageId || null
             };
         } catch (error) {
-            const msg = String(error && error.message || '').toLowerCase();
-            const code = String(error && error.code || '').toUpperCase();
-            const isConnTimeout = code === 'ETIMEDOUT' || msg.includes('connection timeout');
-            const isGmailHost = String(SMTP_HOST || '').toLowerCase().includes('gmail.com');
-
-            if (isConnTimeout && isGmailHost) {
-                const retryPort = SMTP_PORT === 465 ? 587 : 465;
+            if (canRetrySmtp(error)) {
+                const primaryHost = getEffectiveSmtpHost();
+                const retryHost = primaryHost || 'smtp.gmail.com';
+                const retryPort = getEffectiveSmtpPort() === 465 ? 587 : 465;
                 const retrySecure = retryPort === 465;
 
                 const retryTransporter = createSmtpTransport({
-                    host: SMTP_HOST,
+                    host: retryHost,
                     port: retryPort,
                     secure: retrySecure
                 });
