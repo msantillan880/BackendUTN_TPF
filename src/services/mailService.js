@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 
 const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5000';
+const MAIL_PROVIDER = String(process.env.MAIL_PROVIDER || 'auto').toLowerCase();
 const SMTP_SERVICE = process.env.SMTP_SERVICE || '';
 const SMTP_HOST = process.env.SMTP_HOST || '';
 const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
@@ -21,8 +22,21 @@ const SMTP_SOCKET_TIMEOUT_MS = process.env.SMTP_SOCKET_TIMEOUT_MS
     ? Number(process.env.SMTP_SOCKET_TIMEOUT_MS)
     : 15000;
 const SMTP_FORCE_IPV4 = String(process.env.SMTP_FORCE_IPV4 || 'true').toLowerCase() === 'true';
+const BREVO_API_KEY = String(process.env.BREVO_API_KEY || '').trim();
+const BREVO_SENDER_EMAIL = String(process.env.BREVO_SENDER_EMAIL || '').trim();
+const BREVO_SENDER_NAME = String(process.env.BREVO_SENDER_NAME || 'BookmarksUTN').trim();
 
 let transporter;
+
+function isSmtpConfigured() {
+    if (SMTP_SERVICE && SMTP_USER) return true;
+    if (SMTP_HOST && SMTP_USER) return true;
+    return false;
+}
+
+function canUseBrevoApi() {
+    return Boolean(BREVO_API_KEY && BREVO_SENDER_EMAIL);
+}
 
 function buildSimpleEmailHtml({
     title,
@@ -110,6 +124,122 @@ function getTransporter() {
 }
 
 class MailService {
+    async sendWithSmtp({ to, subject, text, html }) {
+        const info = await getTransporter().sendMail({
+            from: SMTP_FROM,
+            to,
+            subject,
+            text,
+            html
+        });
+
+        return {
+            success: true,
+            preview: info?.message || null,
+            messageId: info?.messageId || null
+        };
+    }
+
+    async sendWithBrevoApi({ to, subject, text, html }) {
+        if (!canUseBrevoApi()) {
+            return {
+                success: false,
+                error: 'BREVO_API_KEY o BREVO_SENDER_EMAIL no configurado'
+            };
+        }
+
+        if (typeof fetch !== 'function') {
+            return {
+                success: false,
+                error: 'fetch no disponible en runtime para envio por API'
+            };
+        }
+
+        const payload = {
+            sender: {
+                name: BREVO_SENDER_NAME,
+                email: BREVO_SENDER_EMAIL
+            },
+            to: [
+                { email: to }
+            ],
+            subject,
+            htmlContent: html,
+            textContent: text
+        };
+
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'api-key': BREVO_API_KEY
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const raw = await response.text();
+        let parsed = null;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (_err) {
+            parsed = null;
+        }
+
+        if (!response.ok) {
+            const detail = parsed?.message || parsed?.code || raw || `HTTP ${response.status}`;
+            return {
+                success: false,
+                error: `Brevo API error: ${detail}`
+            };
+        }
+
+        return {
+            success: true,
+            preview: null,
+            messageId: parsed?.messageId || parsed?.messageIds?.[0] || null
+        };
+    }
+
+    async sendMailWithFallback({ to, subject, text, html }) {
+        const wantsBrevo = MAIL_PROVIDER === 'brevo';
+        const wantsSmtp = MAIL_PROVIDER === 'smtp';
+
+        if (wantsBrevo) {
+            return this.sendWithBrevoApi({ to, subject, text, html });
+        }
+
+        if (!wantsBrevo && (wantsSmtp || isSmtpConfigured())) {
+            const smtpResult = await this.sendWithSmtp({ to, subject, text, html })
+                .catch((error) => ({
+                    success: false,
+                    error: String(error && error.message || 'Error SMTP')
+                }));
+
+            if (smtpResult.success) {
+                return smtpResult;
+            }
+
+            if (canUseBrevoApi() && !wantsSmtp) {
+                const brevoResult = await this.sendWithBrevoApi({ to, subject, text, html });
+                if (brevoResult.success) {
+                    console.warn(`SMTP fallo y se uso fallback Brevo API: ${smtpResult.error}`);
+                } else {
+                    console.error(`SMTP fallo (${smtpResult.error}) y fallback Brevo tambien fallo: ${brevoResult.error}`);
+                }
+                return brevoResult;
+            }
+
+            return smtpResult;
+        }
+
+        if (canUseBrevoApi()) {
+            return this.sendWithBrevoApi({ to, subject, text, html });
+        }
+
+        // Fallback local: mantiene flujo en desarrollo sin proveedor real.
+        return this.sendWithSmtp({ to, subject, text, html });
+    }
+
     async enviarVerificacionEmail(emailDestino, verificationToken) {
         const verifyUrl = `${APP_BASE_URL}/api/auth/verify-email?token=${encodeURIComponent(verificationToken)}`;
         const html = buildSimpleEmailHtml({
@@ -121,18 +251,21 @@ class MailService {
         });
 
         try {
-            const info = await getTransporter().sendMail({
-                from: SMTP_FROM,
+            const result = await this.sendMailWithFallback({
                 to: emailDestino,
                 subject: 'Activacion de cuenta - BookmarksUTN',
                 text: `Bienvenido. Verifica tu cuenta en: ${verifyUrl}`,
                 html
             });
 
+            if (!result.success) {
+                throw new Error(result.error || 'No se pudo enviar email de verificacion');
+            }
+
             return {
                 success: true,
-                preview: info?.message || null,
-                messageId: info?.messageId || null,
+                preview: result?.preview || null,
+                messageId: result?.messageId || null,
                 verifyUrl
             };
         } catch (error) {
@@ -158,18 +291,21 @@ class MailService {
         });
 
         try {
-            const info = await getTransporter().sendMail({
-                from: SMTP_FROM,
+            const result = await this.sendMailWithFallback({
                 to: emailDestino,
                 subject: 'Recuperacion de contrasena - BookmarksUTN',
                 text: `Recibimos una solicitud para restablecer tu contrasena. Usa este enlace: ${resetUrl}`,
                 html
             });
 
+            if (!result.success) {
+                throw new Error(result.error || 'No se pudo enviar email de recuperacion');
+            }
+
             return {
                 success: true,
-                preview: info?.message || null,
-                messageId: info?.messageId || null,
+                preview: result?.preview || null,
+                messageId: result?.messageId || null,
                 resetUrl
             };
         } catch (error) {
