@@ -523,6 +523,16 @@ const options = {
                     }
                 }
             },
+            '/api/manual-pdf': {
+                get: {
+                    tags: ['Extras'],
+                    summary: 'Visualizar manual PDF',
+                    responses: {
+                        200: { description: 'OK (application/pdf)' },
+                        404: { description: 'Manual no encontrado', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } }
+                    }
+                }
+            },
             '/api/leeLog': {
                 post: {
                     tags: ['Extras'],

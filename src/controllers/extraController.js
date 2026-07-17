@@ -10,6 +10,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 class ExtraController {
 
+    getManualPdfPath() {
+        const candidates = [
+            path.join(process.cwd(), 'docs', 'ExplicacionTPF.pdf'),
+            path.join(process.cwd(), 'ExplicacionTPF.pdf'),
+            path.join(process.cwd(), 'docs', 'guia_tpf_completa_auth_autorizacion.pdf')
+        ];
+
+        return candidates.find((candidate) => fs.existsSync(candidate)) || null;
+    }
+
     filtrarLineasDeNegocio(lineas = []) {
         const tagsPermitidos = ['[CREAR]', '[MODIFICAR]', '[BORRAR]', '[BUSCAR]', '[APROBAR]', '[RECHAZAR]', '[EXPULSAR]', '[EXPULSAR-LINKS]'];
         return (lineas || []).filter((linea) => tagsPermitidos.some((tag) => String(linea || '').includes(tag)));
@@ -20,8 +30,14 @@ class ExtraController {
     // LEER PDF
     // =========================
     async leerPdf() {
+        const manualPath = this.getManualPdfPath();
+
+        if (!manualPath) {
+            throw new ServerError('No se encontro el archivo del manual PDF', 404);
+        }
+
         return {
-            url: "/ExplicacionTPF.pdf"
+            url: '/api/manual-pdf'
         };
     }
 
@@ -128,6 +144,17 @@ class ExtraController {
     async leerPdfHandler(request, response) {
         const result = await this.leerPdf();
         return apiResponse.success(response, result, 'PDF obtenido');
+    }
+
+    async manualPdfHandler(request, response) {
+        const manualPath = this.getManualPdfPath();
+        if (!manualPath) {
+            throw new ServerError('No se encontro el archivo del manual PDF', 404);
+        }
+
+        response.setHeader('Content-Type', 'application/pdf');
+        response.setHeader('Content-Disposition', 'inline; filename="ExplicacionTPF.pdf"');
+        return response.sendFile(manualPath);
     }
 
     async leerLogHandler(request, response) {
