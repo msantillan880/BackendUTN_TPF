@@ -11,7 +11,16 @@ function parsePositiveInt(value, fallback) {
     return Math.floor(n);
 }
 
-const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5000';
+function resolveAppBaseUrl() {
+    const configuredBaseUrl = cleanEnv(process.env.APP_BASE_URL);
+    const renderBaseUrl = cleanEnv(process.env.RENDER_EXTERNAL_URL);
+    const isProduction = cleanEnv(process.env.NODE_ENV).toLowerCase() === 'production';
+
+    const resolved = configuredBaseUrl || renderBaseUrl || (isProduction ? '' : 'http://localhost:5000');
+    return resolved.replace(/\/+$/, '');
+}
+
+const APP_BASE_URL = resolveAppBaseUrl();
 const MAIL_PROVIDER = cleanEnv(process.env.MAIL_PROVIDER, 'auto').toLowerCase();
 const SMTP_SERVICE = cleanEnv(process.env.SMTP_SERVICE);
 const SMTP_HOST = cleanEnv(process.env.SMTP_HOST);
@@ -103,6 +112,18 @@ function buildSimpleEmailHtml({
         </table>
     </body>
 </html>`;
+}
+
+function buildAbsoluteAppUrl(pathnameWithQuery) {
+    if (!APP_BASE_URL) {
+        throw new Error('APP_BASE_URL no configurado en produccion. Configure APP_BASE_URL o RENDER_EXTERNAL_URL.');
+    }
+
+    const path = String(pathnameWithQuery || '').startsWith('/')
+        ? String(pathnameWithQuery)
+        : `/${String(pathnameWithQuery || '')}`;
+
+    return `${APP_BASE_URL}${path}`;
 }
 
 function getTransporter() {
@@ -290,7 +311,7 @@ class MailService {
     }
 
     async enviarVerificacionEmail(emailDestino, verificationToken) {
-        const verifyUrl = `${APP_BASE_URL}/api/auth/verify-email?token=${encodeURIComponent(verificationToken)}`;
+        const verifyUrl = buildAbsoluteAppUrl(`/api/auth/verify-email?token=${encodeURIComponent(verificationToken)}`);
         const html = buildSimpleEmailHtml({
             title: 'Activacion de cuenta',
             message: 'Bienvenido a BookmarksUTN. Para activar su cuenta, haga click en el siguiente boton.',
@@ -332,7 +353,7 @@ class MailService {
     }
 
     async enviarResetPassword(emailDestino, resetToken) {
-        const resetUrl = `${APP_BASE_URL}/public/index.html?resetToken=${encodeURIComponent(resetToken)}`;
+        const resetUrl = buildAbsoluteAppUrl(`/public/index.html?resetToken=${encodeURIComponent(resetToken)}`);
         const html = buildSimpleEmailHtml({
             title: 'Recuperacion de contrasena',
             message: 'Recibimos una solicitud para restablecer su contrasena. Use el boton para continuar.',
