@@ -1,30 +1,33 @@
 import nodemailer from 'nodemailer';
 
-const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5000';
-const MAIL_PROVIDER = String(process.env.MAIL_PROVIDER || 'auto').toLowerCase();
-const SMTP_SERVICE = process.env.SMTP_SERVICE || '';
-const SMTP_HOST = process.env.SMTP_HOST || '';
-const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
-const SMTP_SECURE = String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
-const SMTP_USER = process.env.SMTP_USER || '';
-const SMTP_PASS = process.env.SMTP_PASS || '';
-const SMTP_FROM = String(process.env.SMTP_FROM || 'BookmarksUTN <no-reply@bookmarksutn.local>')
-    .replace(/[\r\n]+/g, ' ')
-    .trim();
+function cleanEnv(value, fallback = '') {
+    if (value === undefined || value === null) return fallback;
+    return String(value).replace(/[\r\n]+/g, ' ').trim();
+}
 
-const SMTP_CONNECTION_TIMEOUT_MS = process.env.SMTP_CONNECTION_TIMEOUT_MS
-    ? Number(process.env.SMTP_CONNECTION_TIMEOUT_MS)
-    : 10000;
-const SMTP_GREETING_TIMEOUT_MS = process.env.SMTP_GREETING_TIMEOUT_MS
-    ? Number(process.env.SMTP_GREETING_TIMEOUT_MS)
-    : 10000;
-const SMTP_SOCKET_TIMEOUT_MS = process.env.SMTP_SOCKET_TIMEOUT_MS
-    ? Number(process.env.SMTP_SOCKET_TIMEOUT_MS)
-    : 15000;
+function parsePositiveInt(value, fallback) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return fallback;
+    return Math.floor(n);
+}
+
+const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5000';
+const MAIL_PROVIDER = cleanEnv(process.env.MAIL_PROVIDER, 'auto').toLowerCase();
+const SMTP_SERVICE = cleanEnv(process.env.SMTP_SERVICE);
+const SMTP_HOST = cleanEnv(process.env.SMTP_HOST);
+const SMTP_PORT = parsePositiveInt(process.env.SMTP_PORT, 587);
+const SMTP_SECURE = String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
+const SMTP_USER = cleanEnv(process.env.SMTP_USER);
+const SMTP_PASS = cleanEnv(process.env.SMTP_PASS);
+const SMTP_FROM = cleanEnv(process.env.SMTP_FROM, 'BookmarksUTN <no-reply@bookmarksutn.local>');
+
+const SMTP_CONNECTION_TIMEOUT_MS = parsePositiveInt(process.env.SMTP_CONNECTION_TIMEOUT_MS, 10000);
+const SMTP_GREETING_TIMEOUT_MS = parsePositiveInt(process.env.SMTP_GREETING_TIMEOUT_MS, 10000);
+const SMTP_SOCKET_TIMEOUT_MS = parsePositiveInt(process.env.SMTP_SOCKET_TIMEOUT_MS, 15000);
 const SMTP_FORCE_IPV4 = String(process.env.SMTP_FORCE_IPV4 || 'true').toLowerCase() === 'true';
-const BREVO_API_KEY = String(process.env.BREVO_API_KEY || '').trim();
-const BREVO_SENDER_EMAIL = String(process.env.BREVO_SENDER_EMAIL || '').trim();
-const BREVO_SENDER_NAME = String(process.env.BREVO_SENDER_NAME || 'BookmarksUTN').trim();
+const BREVO_API_KEY = cleanEnv(process.env.BREVO_API_KEY);
+const BREVO_SENDER_EMAIL = cleanEnv(process.env.BREVO_SENDER_EMAIL);
+const BREVO_SENDER_NAME = cleanEnv(process.env.BREVO_SENDER_NAME, 'BookmarksUTN');
 
 let transporter;
 
@@ -212,7 +215,9 @@ class MailService {
             const smtpResult = await this.sendWithSmtp({ to, subject, text, html })
                 .catch((error) => ({
                     success: false,
-                    error: String(error && error.message || 'Error SMTP')
+                    error: String(error && error.message || 'Error SMTP'),
+                    code: String(error && error.code || ''),
+                    command: String(error && error.command || '')
                 }));
 
             if (smtpResult.success) {
@@ -259,7 +264,9 @@ class MailService {
             });
 
             if (!result.success) {
-                throw new Error(result.error || 'No se pudo enviar email de verificacion');
+                const debug = [result.code, result.command].filter(Boolean).join('|');
+                const detail = debug ? `${result.error || 'Error SMTP'} [${debug}]` : (result.error || 'Error SMTP');
+                throw new Error(detail);
             }
 
             return {
@@ -299,7 +306,9 @@ class MailService {
             });
 
             if (!result.success) {
-                throw new Error(result.error || 'No se pudo enviar email de recuperacion');
+                const debug = [result.code, result.command].filter(Boolean).join('|');
+                const detail = debug ? `${result.error || 'Error SMTP'} [${debug}]` : (result.error || 'Error SMTP');
+                throw new Error(detail);
             }
 
             return {
