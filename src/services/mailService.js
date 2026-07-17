@@ -31,6 +31,28 @@ const BREVO_SENDER_NAME = cleanEnv(process.env.BREVO_SENDER_NAME, 'BookmarksUTN'
 
 let transporter;
 
+function createSmtpTransport({ host, port, secure }) {
+    const timeoutOptions = {
+        connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+        greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+        socketTimeout: SMTP_SOCKET_TIMEOUT_MS
+    };
+
+    const networkOptions = SMTP_FORCE_IPV4 ? { family: 4 } : {};
+
+    return nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: {
+            user: SMTP_USER,
+            pass: SMTP_PASS
+        },
+        ...networkOptions,
+        ...timeoutOptions
+    });
+}
+
 function isSmtpConfigured() {
     if (SMTP_SERVICE && SMTP_USER) return true;
     if (SMTP_HOST && SMTP_USER) return true;
@@ -86,27 +108,20 @@ function buildSimpleEmailHtml({
 function getTransporter() {
     if (transporter) return transporter;
 
-    const timeoutOptions = {
-        connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
-        greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
-        socketTimeout: SMTP_SOCKET_TIMEOUT_MS
-    };
-
-    const networkOptions = SMTP_FORCE_IPV4 ? { family: 4 } : {};
-
     if (SMTP_HOST && SMTP_USER) {
-        transporter = nodemailer.createTransport({
+        transporter = createSmtpTransport({
             host: SMTP_HOST,
             port: SMTP_PORT,
-            secure: SMTP_SECURE,
-            auth: {
-                user: SMTP_USER,
-                pass: SMTP_PASS
-            },
-            ...networkOptions,
-            ...timeoutOptions
+            secure: SMTP_SECURE
         });
     } else if (SMTP_SERVICE && SMTP_USER) {
+        const timeoutOptions = {
+            connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+            greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+            socketTimeout: SMTP_SOCKET_TIMEOUT_MS
+        };
+        const networkOptions = SMTP_FORCE_IPV4 ? { family: 4 } : {};
+
         transporter = nodemailer.createTransport({
             service: SMTP_SERVICE,
             auth: {
@@ -128,19 +143,48 @@ function getTransporter() {
 
 class MailService {
     async sendWithSmtp({ to, subject, text, html }) {
-        const info = await getTransporter().sendMail({
+        const payload = {
             from: SMTP_FROM,
             to,
             subject,
             text,
             html
-        });
-
-        return {
-            success: true,
-            preview: info?.message || null,
-            messageId: info?.messageId || null
         };
+
+        try {
+            const info = await getTransporter().sendMail(payload);
+
+            return {
+                success: true,
+                preview: info?.message || null,
+                messageId: info?.messageId || null
+            };
+        } catch (error) {
+            const msg = String(error && error.message || '').toLowerCase();
+            const code = String(error && error.code || '').toUpperCase();
+            const isConnTimeout = code === 'ETIMEDOUT' || msg.includes('connection timeout');
+            const isGmailHost = String(SMTP_HOST || '').toLowerCase().includes('gmail.com');
+
+            if (isConnTimeout && isGmailHost) {
+                const retryPort = SMTP_PORT === 465 ? 587 : 465;
+                const retrySecure = retryPort === 465;
+
+                const retryTransporter = createSmtpTransport({
+                    host: SMTP_HOST,
+                    port: retryPort,
+                    secure: retrySecure
+                });
+
+                const retryInfo = await retryTransporter.sendMail(payload);
+                return {
+                    success: true,
+                    preview: retryInfo?.message || null,
+                    messageId: retryInfo?.messageId || null
+                };
+            }
+
+            throw error;
+        }
     }
 
     async sendWithBrevoApi({ to, subject, text, html }) {
