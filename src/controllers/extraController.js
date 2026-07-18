@@ -10,6 +10,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 class ExtraController {
 
+    resolveBackendBaseUrl() {
+        const configured = String(process.env.APP_BASE_URL || '').trim();
+        const renderExternal = String(process.env.RENDER_EXTERNAL_URL || '').trim();
+        const fallback = 'http://localhost:5000';
+        const base = configured || renderExternal || fallback;
+        return base.replace(/\/+$/, '');
+    }
+
     getManualPdfPath() {
         const candidates = [
             path.join(process.cwd(), 'docs', 'ExplicacionTPF.pdf'),
@@ -36,8 +44,10 @@ class ExtraController {
             throw new ServerError('No se encontro el archivo del manual PDF', 404);
         }
 
+        const backendBaseUrl = this.resolveBackendBaseUrl();
+
         return {
-            url: '/api/manual-pdf'
+            url: `${backendBaseUrl}/api/manual-pdf`
         };
     }
 
