@@ -4,6 +4,5 @@ node_modules/
 *.db-shm
 *.db-wal
 # Local notas
-docs/
-!docs/
+docs/*
 !docs/ExplicacionTPF.pdf
