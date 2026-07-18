@@ -2,9 +2,19 @@ import ServerError from '../Helpers/serverError.helper.js';
 import { verifyAccessToken } from '../utils/token.js';
 
 export function authJwt(request, _response, next) {
+    const method = String(request.method || '').toUpperCase();
+    const path = String(request.path || '').toLowerCase();
+    const isPublicManualRoute =
+        (method === 'GET' && path === '/manual-pdf') ||
+        (method === 'POST' && path === '/leepdf');
+
+    if (isPublicManualRoute) {
+        return next();
+    }
+
     const authHeader = request.headers.authorization || '';
     const tokenFromQuery = String(request.query?.token || '').trim();
-    const isLogViewRoute = String(request.path || '').toLowerCase() === '/log-view';
+    const isLogViewRoute = path === '/log-view';
     let token = '';
 
     if (authHeader.startsWith('Bearer ')) {
