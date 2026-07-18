@@ -1,32 +1,25 @@
-# Bookmarks - Node.js + Express
+# BackendUTN_TPF
 
-Breve descripción
+Backend del TP Final de Backend UTN (Node.js + Express + MySQL), con autenticacion JWT, verificacion por email, autorizacion por roles en espacios, logging y exportaciones.
 
-Este proyecto es una aplicación de administración de marcadores (bookmarks) implementada con Node.js y Express. Incluye:
+## URLs publicas
 
-- API REST para CRUD de links
-- Búsqueda con filtros por `categoria`, `nombre`, `comentario` y `direccion`
-- Comunicación en tiempo real con Socket.IO (observador para logs/notificaciones)
-- Persistencia en MySQL (`mysql2`) — migración en curso
-- Logger centralizado con `winston`
+- Frontend: https://bookmarksutn-tpf.onrender.com
+- Backend API: https://backendutn-tpf.onrender.com
+- Swagger UI: https://backendutn-tpf.onrender.com/api-docs
+- OpenAPI JSON: https://backendutn-tpf.onrender.com/api-docs.json
 
-Estructura principal
+## Stack
 
-- `src/routes/` — rutas de Express
-- `src/controllers/` — lógica de negocio (`LinkController`)
-- `src/db/` — inicialización de DB y queries (`queries.js`)
-- `src/middleware/` — middlewares (p. ej. `xssValidation.js`)
-- `src/utils/` — utilidades (observer, logger, time helper)
-- `src/logs/` — archivo de logs
+- Node.js + Express
+- MySQL (`mysql2`)
+- JWT (`jsonwebtoken`)
+- Password hashing (`bcrypt`)
+- Email (Resend / SMTP / Brevo)
+- Swagger (`swagger-jsdoc`, `swagger-ui-express`)
+- Socket.IO
 
-Notas técnicas actuales
-
-- Las queries SQL están centralizadas en `src/db/queries.js`.
-- La búsqueda fue adaptada para construir queries dinámicamente usando parámetros y combinando solo los filtros provistos (AND). Esto evita sobreescribir resultados cuando se usan múltiples filtros.
-- Se registran eventos (crear/modificar/borrar/buscar) mediante un observer y `winston`.
-- Hay validación básica XSS en `src/middleware/xssValidation.js`.
-
-Cómo ejecutar (desarrollo)
+## Ejecutar en local
 
 1. Instalar dependencias:
 
@@ -34,218 +27,88 @@ Cómo ejecutar (desarrollo)
 npm install
 ```
 
-2. Iniciar la aplicación:
+2. Configurar variables de entorno en `.env` (ver `.env.example`).
+
+3. Iniciar servidor:
 
 ```bash
 npm start
 ```
 
-3. Probar la API con Swagger o Postman.
+Servidor por defecto: `http://localhost:5000`
 
-Documentacion Swagger (para entrega)
+## Variables de entorno (principales)
 
-- UI interactiva: `GET /api-docs`
-- JSON OpenAPI: `GET /api-docs.json`
+### Base de datos
 
-Endpoints relevantes
+- `MYSQL_HOST`
+- `MYSQL_PORT`
+- `MYSQL_USER`
+- `MYSQL_PASSWORD`
+- `MYSQL_DATABASE`
+- Alternativa por URI: `MYSQL_URI` / `MYSQL_ADDON_URI` / `CLEVERCLOUD_MYSQL_ADDON_URI`
 
-- Auth
-  - `POST /api/auth/register` — Registro con `nombre`, `email`, `password`
-  - `GET /api/auth/verify-email?token=...` — Verificacion de email
-  - `POST /api/auth/login` — Login con `email`, `password` (retorna Bearer token)
-  - `POST /api/auth/forgot-password` — Solicitar recuperacion de contrasena
-  - `POST /api/auth/reset-password` — Confirmar nueva contrasena con token
-  - `GET /api/auth/me` — Datos del usuario autenticado (requiere Bearer token)
-- Links
-  - `GET /api/links` — Obtener todos los links
-  - `GET /api/links/:id` — Obtener link por id
-  - `POST /api/crear` — Crear link
-  - `PUT /api/actualizar/:id` — Actualizar link
-  - `DELETE /api/eliminar/:id` — Borrar link
-  - `POST /api/buscar` — Buscar por filtros (`categoria`, `nombre`, `comentario`, `direccion`)
-- Multiusuario (protegido con JWT)
-  - `GET /api/usuarios` — Listar usuarios
-  - `DELETE /api/usuarios/:id` — Borrar usuario con dependencias (usuario, espacios owner, relaciones y links de esos espacios)
-  - `GET /api/estados-solicitudes` — Listar estados
-  - `GET /api/espacios` — Listar espacios
-  - `GET /api/espacios/:id` — Obtener espacio por id
-  - `POST /api/espacios` — Crear espacio
-  - `GET /api/espacios/:id/miembros` — Listar miembros del espacio
-  - `POST /api/espacios/:id/solicitudes` — Solicitar ingreso
-  - `PUT /api/espacios/:id/solicitudes/:idUsuario/aprobar` — Aprobar solicitud
-  - `PUT /api/espacios/:id/solicitudes/:idUsuario/rechazar` — Rechazar solicitud
-  - `PUT /api/espacios/:id/usuarios/:idUsuario/expulsar` — Expulsar usuario
-- Extras
-  - `POST /api/espacios/:id/generar-html` — Descargar bookmarks del espacio seleccionado
-  - `GET /api/log-view`
-  - `POST /api/leePdf`
-  - `POST /api/leeLog`
-
-Ejemplo de búsqueda (curl):
-
-```bash
-curl -s -X POST http://localhost:5000/api/buscar \
-  -H "Content-Type: application/json" \
-  -d '{"comentario":"noticias"}' | jq
-```
-
-Consideraciones:
-
-- Separación en capas: la aplicación organiza rutas, controladores y consulta a la BD en archivos separados, lo cual sigue buenas prácticas básicas.
-- Recomendaciones de mejora: paginación, test unitarios.
-
-## Migración a MySQL
-
-Se migró la persistencia de `better-sqlite3` a `mysql2` usando un pool de conexiones.
-Variables de entorno (opcional, con valores por defecto):
-
-- `MYSQL_HOST` (por defecto `127.0.0.1`)
-- `MYSQL_PORT` (por defecto `3306`)
-- `MYSQL_USER` (por defecto `root`)
-- `MYSQL_PASSWORD` (por defecto ``)
-- `MYSQL_DATABASE` (por defecto `bookmarks`)
-
-Variables nuevas para autenticacion/email:
+### Auth
 
 - `JWT_ACCESS_SECRET`
-- `JWT_ACCESS_EXPIRES` (por defecto `15m`)
-- `BCRYPT_SALT_ROUNDS` (por defecto `10`)
-- `EMAIL_VERIFY_TTL_HOURS` (por defecto `24`)
-- `RESET_PASSWORD_TTL_MINUTES` (por defecto `30`)
-- `APP_BASE_URL` (por defecto `http://localhost:5000`)
+- `JWT_ACCESS_EXPIRES` (default `15m`)
+- `BCRYPT_SALT_ROUNDS` (default `10`)
+
+### Email
+
+- `APP_BASE_URL`
 - `MAIL_PROVIDER` (`auto`, `smtp`, `resend`, `brevo`)
-- `RESEND_API_KEY`, `RESEND_FROM`
-- `SMTP_SERVICE`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
 
-Nota: si no se configura SMTP, el sistema usa un transporte JSON de desarrollo para poder probar el flujo de verificacion sin envio real.
+Resend:
 
-### Prueba con Resend (recomendado en Render)
+- `RESEND_API_KEY`
+- `RESEND_FROM`
 
-Configurar en `.env` o variables del servicio:
+SMTP:
 
-```bash
-MAIL_PROVIDER=resend
-RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxx
-RESEND_FROM="BookmarksUTN <onboarding@resend.dev>"
-```
+- `SMTP_SERVICE`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`
+- `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
 
-Para produccion, se recomienda verificar dominio propio en Resend y usar un remitente de ese dominio.
+Brevo:
 
-### Prueba con Gmail (sugerido para profesores)
+- `BREVO_API_KEY`
+- `BREVO_SENDER_EMAIL`
+- `BREVO_SENDER_NAME`
 
-Para usar dos cuentas de prueba (por ejemplo `usuario1` y `usuario2`) con Gmail:
+## Endpoints principales
 
-1. Crear dos cuentas Gmail dedicadas al TP.
-2. Activar verificacion en 2 pasos en cada cuenta.
-3. Generar una App Password por cuenta (Google no recomienda usar password normal de la cuenta).
-4. Configurar en `.env`:
+### Auth
 
-```bash
-SMTP_SERVICE=gmail
-SMTP_USER=tu_cuenta_gmail@gmail.com
-SMTP_PASS=app_password_de_google
-SMTP_FROM="BookmarksUTN <tu_cuenta_gmail@gmail.com>"
-```
+- `POST /api/auth/register`
+- `GET /api/auth/verify-email?token=...`
+- `POST /api/auth/login`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+- `GET /api/auth/me`
 
-Si queres alternar entre cuentas para demo, cambia `SMTP_USER` y `SMTP_PASS` y reinicia el servidor.
+### Espacios y links
 
-## Reglas de autorizacion implementadas
+- `GET /api/espacios`
+- `POST /api/espacios`
+- `GET /api/links`
+- `POST /api/links`
+- `PATCH /api/links/:id`
+- `DELETE /api/links/:id`
 
-- Owner del espacio:
-  - Puede aprobar/rechazar/expulsar miembros.
-  - Puede modificar y borrar links del espacio.
-  - Puede ver listado de miembros del espacio.
-- Visitante aprobado:
-  - Puede crear links y realizar busquedas/listados en espacios aprobados.
-  - No puede modificar ni borrar links.
-- Usuario no autorizado:
-  - No puede crear links ni ver links de espacios no aprobados.
+### Extras
 
-## Flujo rapido de prueba (Auth)
+- `POST /api/espacios/:id/generar-html`
+- `POST /api/leePdf`
+- `GET /api/manual-pdf`
+- `GET /api/log-view`
 
-1. Registrar usuario:
+## Repositorio frontend
 
-```bash
-curl -s -X POST http://localhost:5000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"nombre":"test","email":"test@mail.com","password":"12345678"}'
-```
+UI desacoplada en:
 
-2. Tomar `verifyUrlDev` de la respuesta y abrirla (o llamar por curl) para verificar email.
+- https://github.com/msantillan880/FrontendUTN_TPF
 
-3. Loguear:
+## Notas de entrega
 
-```bash
-curl -s -X POST http://localhost:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@mail.com","password":"12345678"}'
-```
-
-4. Usar el `accessToken` en `Authorization: Bearer ...` para endpoints protegidos.
-
-## Frontend desacoplado
-
-La catedra requiere repositorios separados.
-
-- Backend (este repositorio): API + DB + auth + documentacion.
-- Frontend (repositorio separado): UI web que consume la API.
-
-Frontend actual: https://github.com/msantillan880/FrontendUTN_TPF
-
-Pasos para ejecutar con MySQL:
-
-1. Crear la base de datos (si no existe):
-
-```sql
-CREATE DATABASE IF NOT EXISTS bookmarks CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-```
-
-2. Exportar variables de entorno o crear `.env` con las mismas.
-3. Instalar dependencias y ejecutar:
-
-```bash
-npm install
-npm start
-```
-
-Si prefieres seguir usando SQLite temporalmente, restaura la dependencia o ejecuta la rama anterior.
-
-Resumen de próximos pasos sugeridos
-
-- Añadir validación de esquemas y middleware de errores uniforme.
-- Implementar tests unitarios e integración para endpoints y controllers.
-
-## Estado actual (post-demo)
-
-- Backend API-only en este repositorio.
-- Se mantienen `usuario1` y `usuario2` como usuarios base para pruebas diarias.
-- Los links se asocian al espacio por `idEspacio`.
-
-## Re-seed para pruebas diarias
-
-Para recuperar el estado base de demo persistido:
-
-1. Ejecutar el script [src/db/003_seed_mock_multiusuario.sql](src/db/003_seed_mock_multiusuario.sql) sobre la base configurada (`bookmarks` por defecto).
-2. Reiniciar la app.
-
-Ejemplo:
-
-```bash
-mysql -h 127.0.0.1 -P 3306 -u root -p bookmarks < src/db/003_seed_mock_multiusuario.sql
-npm start
-```
-
-## Estructura mínima sugerida (avance inicial)
-
-Se agregó `src/config/db.js` para centralizar la configuración de base de datos.
-`src/db/database.js` se mantiene como compatibilidad y reexporta desde `src/config/db.js`.
-
-Siguientes pasos (en próximos commits):
-
-- `src/repositories/`: mover acceso SQL desde controllers.
-- `src/services/`: mover lógica de negocio.
-- Mantener `src/controllers/` solo para `req/res`.
-
----
-
-Fecha: 2026-06-22
+- El manual de presentacion se sirve desde backend en `docs/ExplicacionTPF.pdf`.
+- Las pruebas completas estan documentadas en `GUIA_PRUEBAS_ENTREGA.txt` y `RESUMEN_PROFE_PRUEBAS_RAPIDAS.txt`.
